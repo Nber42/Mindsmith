@@ -986,6 +986,11 @@
                 setAcciones(prev => [...prev, { id: Date.now(), type: 'updateRecord', payload: { entityType: 'projects', recordId: projectId, data: newData }, timestamp: new Date().toISOString() }]);
             };
 
+            const updateDT = (dtId, newData) => {
+                setDts(prev => prev.map(d => d.id === dtId ? { ...d, ...newData, updatedAt: new Date().toISOString() } : d));
+                setAcciones(prev => [...prev, { id: Date.now(), type: 'updateRecord', payload: { entityType: 'dts', recordId: dtId, data: newData }, timestamp: new Date().toISOString() }]);
+            };
+
             const toggleTarea = (tareaId) => {
                 setTareas(prev => prev.map(t =>
                     t.id === tareaId ? { ...t, estado: t.estado === 'pendiente' ? 'completada' : 'pendiente' } : t
@@ -1210,6 +1215,7 @@
                                 onAddAutor={agregarAutor}
                                 onAddDT={agregarDT}
                                 onAddProyecto={agregarProyecto}
+                                onUpdateDT={updateDT}
                                 onSelectProyecto={setProyectoSeleccionado}
                                 onAccederProyecto={(p) => { setProyectoSeleccionado(p); setVistaActual('plantillas'); }}
                                 setVistaActual={setVistaActual}
@@ -2071,9 +2077,12 @@
             );
         }
 
-        function VistaBaseDatos({ autores, dts, proyectos, projectAuthors, projectDTs, vistaTab, setVistaTab, onAddAutor, onAddDT, onAddProyecto, onSelectProyecto, onAccederProyecto, setVistaActual }) {
+        function VistaBaseDatos({ autores, dts, proyectos, projectAuthors, projectDTs, vistaTab, setVistaTab, onAddAutor, onAddDT, onAddProyecto, onSelectProyecto, onAccederProyecto, setVistaActual, onUpdateDT }) {
             const [modal, setModal] = useState({ abierto: false, tipo: null });
             const [formData, setFormData] = useState({});
+            const [dtDetailModal, setDtDetailModal] = useState({ abierto: false, dt: null });
+            const [dtEditData, setDtEditData] = useState({});
+            const [dtFilters, setDtFilters] = useState({ nombre: '', email: '', facultad: '', estado: '' });
 
             const handleJumpToProject = (projectId) => {
                 setVistaTab('proyectos');
@@ -2264,16 +2273,29 @@
                             <table className="w-full text-left">
                                 <thead className="bg-gray-50 border-b border-gray-200">
                                     <tr>
-                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Director de Título</th>
-                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
-                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Autor Asignado</th>
-                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Asignatura Asignada</th>
-                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Facultad</th>
-                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Estado</th>
+                                        <th className="px-6 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">Director de Título</th>
+                                        <th className="px-6 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
+                                        <th className="px-6 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">Autor Asignado</th>
+                                        <th className="px-6 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">Asignatura Asignada</th>
+                                        <th className="px-6 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">Facultad</th>
+                                        <th className="px-6 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">Estado</th>
+                                    </tr>
+                                    <tr className="bg-gray-50">
+                                        <th className="px-6 py-2"><input type="text" placeholder="Filtrar..." className="w-full px-2 py-1 text-xs border rounded" value={dtFilters.nombre} onChange={e => setDtFilters({ ...dtFilters, nombre: e.target.value })} /></th>
+                                        <th className="px-6 py-2"><input type="text" placeholder="Filtrar..." className="w-full px-2 py-1 text-xs border rounded" value={dtFilters.email} onChange={e => setDtFilters({ ...dtFilters, email: e.target.value })} /></th>
+                                        <th className="px-6 py-2"></th>
+                                        <th className="px-6 py-2"></th>
+                                        <th className="px-6 py-2"><input type="text" placeholder="Filtrar..." className="w-full px-2 py-1 text-xs border rounded" value={dtFilters.facultad} onChange={e => setDtFilters({ ...dtFilters, facultad: e.target.value })} /></th>
+                                        <th className="px-6 py-2"><select className="w-full px-2 py-1 text-xs border rounded" value={dtFilters.estado} onChange={e => setDtFilters({ ...dtFilters, estado: e.target.value })}><option value="">Todos</option><option value="activo">Activo</option><option value="inactivo">Inactivo</option></select></th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                    {dts.map(d => {
+                                    {dts.filter(d =>
+                                        d.nombreCompleto.toLowerCase().includes(dtFilters.nombre.toLowerCase()) &&
+                                        d.email.toLowerCase().includes(dtFilters.email.toLowerCase()) &&
+                                        d.facultad.toLowerCase().includes(dtFilters.facultad.toLowerCase()) &&
+                                        (dtFilters.estado === '' || d.estado === dtFilters.estado)
+                                    ).map(d => {
                                         const pLink = projectDTs.find(l => l.dtId === d.id);
                                         const proyecto = pLink ? proyectos.find(p => p.id === pLink.projectId) : null;
                                         const aLink = proyecto ? projectAuthors.find(l => l.projectId === proyecto.id) : null;
@@ -2281,7 +2303,9 @@
 
                                         return (
                                             <tr key={d.id} className="hover:bg-gray-50 transition-colors">
-                                                <td className="px-6 py-4 font-medium text-gray-700">{d.nombreCompleto}</td>
+                                                <td className="px-6 py-4 font-medium text-gray-700">
+                                                    <button onClick={() => { setDtDetailModal({ abierto: true, dt: d }); setDtEditData(d); }} className="text-orange-400 hover:underline font-bold">👤 {d.nombreCompleto}</button>
+                                                </td>
                                                 <td className="px-6 py-4 text-gray-500">{d.email}</td>
                                                 <td className="px-6 py-4 text-gray-500">
                                                     {autor ? <span className="text-xs font-bold text-slate-600">👤 {autor.nombreCompleto}</span> : <span className="text-gray-300 text-xs italic">-</span>}
@@ -2303,6 +2327,53 @@
                                     })}
                                 </tbody>
                             </table>
+                        )}
+
+                        {/* MODAL DETALLE DT */}
+                        {dtDetailModal.abierto && dtDetailModal.dt && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                                <div className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm" onClick={() => setDtDetailModal({ abierto: false, dt: null })}></div>
+                                <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+                                    <div className="bg-gradient-to-r from-orange-400 to-orange-600 px-8 py-6 text-white">
+                                        <h3 className="text-2xl font-black">Ficha de Director de Título</h3>
+                                        <p className="text-sm opacity-90 mt-1">ID: {dtDetailModal.dt.id}</p>
+                                    </div>
+                                    <div className="p-8 space-y-6 max-h-[600px] overflow-y-auto">
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Nombre Completo</label>
+                                                <input type="text" value={dtEditData.nombreCompleto || ''} onChange={e => setDtEditData({ ...dtEditData, nombreCompleto: e.target.value })} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-400 outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Email</label>
+                                                <input type="email" value={dtEditData.email || ''} onChange={e => setDtEditData({ ...dtEditData, email: e.target.value })} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-400 outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Facultad</label>
+                                                <input type="text" value={dtEditData.facultad || ''} onChange={e => setDtEditData({ ...dtEditData, facultad: e.target.value })} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-400 outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Estado</label>
+                                                <select value={dtEditData.estado || 'activo'} onChange={e => setDtEditData({ ...dtEditData, estado: e.target.value })} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-400 outline-none">
+                                                    <option value="activo">Activo</option>
+                                                    <option value="inactivo">Inactivo</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div className="bg-gray-50 p-4 rounded-lg">
+                                            <p className="text-xs font-bold text-gray-500 uppercase mb-2">Información del Sistema</p>
+                                            <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                                                <div><span className="font-bold">Creado:</span> {dtDetailModal.dt.createdAt ? new Date(dtDetailModal.dt.createdAt).toLocaleString('es-ES') : 'N/A'}</div>
+                                                <div><span className="font-bold">Actualizado:</span> {dtDetailModal.dt.updatedAt ? new Date(dtDetailModal.dt.updatedAt).toLocaleString('es-ES') : 'N/A'}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="bg-gray-50 px-8 py-4 flex justify-end gap-3 border-t">
+                                        <button onClick={() => setDtDetailModal({ abierto: false, dt: null })} className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 transition-all">Cancelar</button>
+                                        <button onClick={() => { onUpdateDT(dtDetailModal.dt.id, dtEditData); setDtDetailModal({ abierto: false, dt: null }); alert('✅ Director actualizado correctamente'); }} className="px-6 py-2 bg-orange-400 text-white rounded-lg font-bold hover:bg-orange-600 transition-all shadow-lg">Guardar Cambios</button>
+                                    </div>
+                                </div>
+                            </div>
                         )}
                         {vistaTab === 'proyectos' && (
                             <table className="w-full text-left">
