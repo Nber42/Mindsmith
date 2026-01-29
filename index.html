@@ -1,0 +1,2557 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mindsmith CRM - Gestión de Manuales Docentes</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .gantt-bar {
+            transition: all 0.3s ease;
+        }
+
+        .gantt-bar:hover {
+            transform: scaleY(1.2);
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+
+<body
+    class="bg-gradient-to-br from-orange-50 to-white text-slate-900 min-h-screen font-sans selection:bg-orange-100 selection:text-orange-600">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        // DATOS DE PROYECTOS CON TODOS LOS HITOS - COLORES MEJORADOS Y DESCRIPCIONES
+        const HITOS_DEFINICION = [
+            // DOSSIER I: INICIO (D1)
+            { id: 'PRE', nombre: 'Solicitud', mes: 0.1, faseId: 'D1', color: 'bg-slate-600', icono: '📝', desc: 'Solicitud inicial y aprobación PR00-1.' },
+            { id: '0A', nombre: 'Normas', mes: 0.2, faseId: 'D1', color: 'bg-slate-600', icono: '📜', desc: 'Aceptación de normas técnicas.' },
+            { id: '0B', nombre: 'Seguridad', mes: 0.3, faseId: 'D1', color: 'bg-slate-600', icono: '🔒', desc: 'Protocolo RGPD firmado.' },
+            { id: '0C', nombre: 'Encargo', mes: 0.4, faseId: 'D1', color: 'bg-slate-600', icono: '📜', desc: 'Formalización del encargo docente.' },
+            { id: '0D', nombre: 'Checklist', mes: 0.5, faseId: 'D1', color: 'bg-slate-600', icono: '✅', desc: 'Checklist de calidad inicial.' },
+            { id: '1A', nombre: 'Solicitud DT', mes: 0.7, faseId: 'D1', color: 'bg-slate-600', icono: '📄', desc: 'Validación por Director de Título.' },
+            { id: '1B', nombre: 'Presupuesto', mes: 0.8, faseId: 'D1', color: 'bg-slate-600', icono: '💰', desc: 'Aprobación presupuestaria final.' },
+            { id: '1D', nombre: 'Cronograma', mes: 0.95, faseId: 'D1', color: 'bg-slate-600', icono: '📅', desc: 'Planificación detallada de hitos.' },
+
+            // DOSSIER II: CONTRATACIÓN (D2)
+            { id: '2A', nombre: 'Alta Técnica', mes: 1.2, faseId: 'D2', color: 'bg-orange-400', icono: '🛠️', desc: 'Activación del entorno Mindsmith.' },
+            { id: 'A', nombre: 'Bienvenida', mes: 1.5, faseId: 'D2', color: 'bg-orange-400', icono: '📧', desc: 'Correo de bienvenida (Hito A).' },
+            { id: 'B', nombre: 'Onboarding', mes: 1.8, faseId: 'D2', color: 'bg-orange-400', icono: '🤝', desc: 'Sesión de arranque de proyecto.' },
+            { id: 'C', nombre: 'Propuesta', mes: 2.1, faseId: 'D2', color: 'bg-orange-400', icono: '✉️', desc: 'Propuesta formal de colaboración.' },
+            { id: '3C', nombre: 'Aceptación', mes: 2.4, faseId: 'D2', color: 'bg-orange-400', icono: '✍️', desc: 'Firma de conformidad del autor.' },
+
+            // DOSSIER III: DESARROLLO (D3)
+            { id: 'E', nombre: 'Muestra SAD', mes: 3.2, faseId: 'D3', color: 'bg-fuchsia-600', icono: '📄', desc: 'Envío de muestra al SAD.' },
+            { id: 'F', nombre: 'Feedback', mes: 3.8, faseId: 'D3', color: 'bg-fuchsia-600', icono: '🔍', desc: 'Informe técnico de calidad.' },
+            { id: 'D', nombre: 'VB Académico', mes: 4.2, faseId: 'D3', color: 'bg-fuchsia-600', icono: '👍', desc: 'Visto bueno final del DT.' },
+
+            // DOSSIER IV: PUBLICACIÓN (D4)
+            { id: 'G', nombre: 'Maquetación', mes: 4.8, faseId: 'D4', color: 'bg-orange-400', icono: '🚚', desc: 'Paso a producción externa.' },
+            { id: 'H', nombre: 'Audit. Acces.', mes: 5.1, faseId: 'D4', color: 'bg-orange-400', icono: '♿', desc: 'Auditoría de accesibilidad WCAG.' },
+            { id: 'L', nombre: 'Rev. Funcional', mes: 5.4, faseId: 'D4', color: 'bg-orange-400', icono: '🧪', desc: 'QA técnico y funcional del SCORM.' },
+            { id: 'O', nombre: 'Cierre', mes: 5.9, faseId: 'D4', color: 'bg-orange-400', icono: '🏁', desc: 'Manual operativo y cierre final.' }
+        ];
+
+        const PROYECTOS = [
+            {
+                id: 'IA101',
+                codigo: 'IA101',
+                nombre: 'IA Fundamentos',
+                dt: 'García',
+                autor: 'Pérez',
+                inicio: 'Sep 2025',
+                hitosCompletados: ['PRE', '0A', 'B'], // Adjusted to new IDs
+                version: null
+            },
+            {
+                id: 'MKT202',
+                codigo: 'MKT202',
+                nombre: 'Marketing Digital',
+                dt: 'Ruiz',
+                autor: 'López',
+                inicio: 'Oct 2025',
+                hitosCompletados: ['PRE', '0A', '2A', 'B', 'E', 'F'], // Adjusted
+                version: null
+            },
+            {
+                id: 'PSI404',
+                codigo: 'PSI404',
+                nombre: 'Psicología Clínica',
+                dt: 'Torres',
+                autor: 'Gómez',
+                inicio: 'Ago 2025',
+                hitosCompletados: ['PRE', '0A', '0B', '0C', '0D', '1A', '1B', '2A', 'A', 'B', 'E', 'F', 'D', 'G', 'H', 'L'], // Adjusted
+                version: 'v2.3.1-final'
+            },
+            {
+                id: 'DER305',
+                codigo: 'DER305',
+                nombre: 'Derecho Mercantil',
+                dt: 'Sánchez',
+                autor: 'Martínez',
+                inicio: 'Nov 2025',
+                hitosCompletados: ['PRE', '0A', '0B', 'E'], // Adjusted
+                version: null
+            }
+        ];
+
+        const FASES_GANTT = [
+            { id: 'D1', nombre: 'DOSSIER I: Inicio', color: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-500', mesInicio: 0, mesFin: 1 },
+            { id: 'D2', nombre: 'DOSSIER II: Contratación', color: 'bg-orange-50/30', border: 'border-orange-100', text: 'text-orange-400', mesInicio: 1, mesFin: 2.5 },
+            { id: 'D3', nombre: 'DOSSIER III: Desarrollo', color: 'bg-fuchsia-50/30', border: 'border-fuchsia-100', text: 'text-fuchsia-500', mesInicio: 2.5, mesFin: 4.5 },
+            { id: 'D4', nombre: 'DOSSIER IV: Publicación', color: 'bg-orange-50/30', border: 'border-orange-100', text: 'text-orange-400', mesInicio: 4.5, mesFin: 6 }
+        ];
+
+        const PLANTILLAS = {
+            'D1': {
+                id: 'D1',
+                nombre: 'DOSSIER I: Inicio y Planificación (Fase 0-1)',
+                fase: 'INICIO / PLANIFICACIÓN',
+                secciones: [
+                    { id: '0C', hitoId: '0C', titulo: 'Encargo Oficial', sub: 'Asignación docente', esPrincipal: true },
+                    { id: '0A', hitoId: 'PRE', titulo: 'Solicitud y Normas', sub: 'Marco normativo técnico (Hito PRE/0A)', esPrincipal: true },
+                    { id: '0B', hitoId: '0B', titulo: 'Seguridad', sub: 'RGPD y Protocolos', esPrincipal: true },
+                    { id: '0D', hitoId: '0D', titulo: 'Checklist Autor', sub: 'Control de calidad inicial', esPrincipal: true },
+                    { id: '1A', hitoId: '1A', titulo: 'Solicitud DT', sub: 'Formalización académica', esPrincipal: true },
+                    { id: '1B', hitoId: '1B', titulo: 'Presupuestos', sub: 'Validación financiera', esPrincipal: true },
+                    { id: '1D', hitoId: '1D', titulo: 'Cronograma', sub: 'Planificación de hitos (6 meses)', esPrincipal: true }
+                ],
+                contenido: (proyecto) => `
+                    <div class="space-y-16">
+                        <section id="0C" class="scroll-mt-24 p-8 border-2 border-slate-100 rounded-3xl bg-white shadow-sm">
+                            <div class="flex justify-between items-start mb-6">
+                                <div>
+                                    <h4 class="text-2xl font-black text-orange-600 mb-1">1. Encargo Oficial de Manual (0C)</h4>
+                                    <p class="text-sm font-bold text-orange-400 uppercase tracking-widest">Formalización de la Orden de Elaboración</p>
+                                </div>
+                                <span class="bg-orange-50 text-orange-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">Orden de Trabajo</span>
+                            </div>
+                            <div class="bg-white p-8 border-2 border-orange-50 rounded-2xl shadow-inner italic font-serif text-slate-700 leading-loose">
+                                <p class="mb-4">Estimado/a ${proyecto.autor},</p>
+                                <p class="mb-4">Es un placer comunicarle que, tras la revisión de su perfil y trayectoria, la Dirección Académica le ha seleccionado para este proyecto. Su designación para esta labor responde a su reconocida competencia técnica y experiencia en el ámbito de <strong>${proyecto.nombre}</strong>, confiando plenamente en que su aportación será clave para la excelencia del material docente.</p>
+                                <p>Por la presente, se le formaliza el encargo para la creación del material didáctico del título correspondiente. 
+                                El manual consta de un total de ${proyecto.datosEncargo?.numUnidades || '12'} unidades de aprendizaje, con una extensión estimada por unidad de 15 a 20 pantallas de contenido interactivo 
+                                en la plataforma Mindsmith.</p>
+                                <p class="mt-4">Este encargo queda vinculado a la validación técnica del Director de Título, <strong>${proyecto.dt}</strong>, y al cumplimiento estricto del cronograma de 6 meses adjunto.</p>
+                            </div>
+                        </section>
+
+                        <section id="0A" class="scroll-mt-24 p-8 border-2 border-slate-100 rounded-3xl bg-white shadow-sm">
+                            <div class="flex justify-between items-start mb-6">
+                                <div>
+                                    <h4 class="text-2xl font-black text-slate-900 mb-1">2. Normas de Uso del Entorno Mindsmith (0A)</h4>
+                                    <p class="text-sm font-bold text-slate-400 uppercase tracking-widest">Estándares de Calidad y Cumplimiento Técnico</p>
+                                </div>
+                                <span class="bg-orange-50 text-orange-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">Normativa PR00-1</span>
+                            </div>
+                            <div class="prose prose-slate max-w-none">
+                                <p class="text-slate-600 leading-relaxed">
+                                    El presente documento establece las directrices obligatorias para la elaboración de manuales docentes dentro de la plataforma **Mindsmith**. 
+                                    Se prohíbe explícitamente el uso de editores externos como Microsoft Word o PDF para la maquetación final, garantizando así la 
+                                    interoperabilidad bajo el estándar **SCORM 1.2** y el cumplimiento de las pautas de accesibilidad **WCAG 2.1 Nivel AA**.
+                                </p>
+                                <ul class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 list-none p-0">
+                                    <li class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                        <span class="block font-black text-orange-400 mb-1">Plataforma Única</span>
+                                        Uso exclusivo de la infraestructura corporativa para evitar la fragmentación de activos.
+                                    </li>
+                                    <li class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                        <span class="block font-black text-orange-400 mb-1">Activos Digitales</span>
+                                        Optimización de imágenes (máx 200KB) y uso de vídeos embebidos vía Stream/Vimeo.
+                                    </li>
+                                </ul>
+                            </div>
+                        </section>
+
+                        <section id="0B" class="scroll-mt-24 p-8 border-2 border-slate-100 rounded-3xl bg-white shadow-sm">
+                            <div class="flex justify-between items-start mb-6">
+                                <div>
+                                    <h4 class="text-2xl font-black text-orange-600 mb-1">3. Guía de Seguridad y Datos (0B)</h4>
+                                    <p class="text-sm font-bold text-orange-400 uppercase tracking-widest">Protocolo de Protección de Información y RGPD</p>
+                                </div>
+                                <span class="bg-orange-50 text-orange-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">Seguridad de la Información</span>
+                            </div>
+                            <div class="bg-orange-50/50 p-6 border border-orange-100 rounded-2xl">
+                                <p class="text-orange-600 font-medium mb-4">
+                                    En cumplimiento del Reglamento General de Protección de Datos (RGPD), se establecen las siguientes medidas de seguridad para la asignatura <strong>${proyecto.nombre}</strong>:
+                                </p>
+                                <div class="space-y-3 text-sm text-orange-600">
+                                    <p>• <strong>Identidad:</strong> Las claves de acceso de <strong>${proyecto.autor}</strong> son personales e intransferibles.</p>
+                                    <p>• <strong>Confidencialidad:</strong> Queda terminantemente prohibido el volcado de datos personales de alumnos o terceros en el material docente.</p>
+                                    <p>• <strong>Propiedad Intelectual:</strong> Todo el contenido generado en Mindsmith es propiedad de la institución bajo los términos contractuales vigentes.</p>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section id="0D" class="scroll-mt-24 p-8 border-2 border-slate-100 rounded-3xl bg-white shadow-sm">
+                            <div class="flex justify-between items-start mb-6">
+                                <div>
+                                    <h4 class="text-2xl font-black text-green-900 mb-1">4. Checklist de Aceptación y Calidad (0D)</h4>
+                                    <p class="text-sm font-bold text-green-400 uppercase tracking-widest">Verificación de Requisitos Técnicos y Pedagógicos</p>
+                                </div>
+                                <span class="bg-green-50 text-green-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">Control de Calidad</span>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="flex items-center gap-3 p-4 bg-green-50/50 rounded-xl border border-green-100">
+                                    <span class="text-green-600 text-xl font-black">✓</span>
+                                    <span class="text-sm font-bold text-green-800 uppercase tracking-tight">Compromiso Mindsmith</span>
+                                </div>
+                                <div class="flex items-center gap-3 p-4 bg-green-50/50 rounded-xl border border-green-100">
+                                    <span class="text-green-600 text-xl font-black">✓</span>
+                                    <span class="text-sm font-bold text-green-800 uppercase tracking-tight">Calendario de Hitos A-O</span>
+                                </div>
+                                <div class="flex items-center gap-3 p-4 bg-green-50/50 rounded-xl border border-green-100">
+                                    <span class="text-green-600 text-xl font-black">✓</span>
+                                    <span class="text-sm font-bold text-green-800 uppercase tracking-tight">Privacidad y Seguridad</span>
+                                </div>
+                                <div class="flex items-center gap-3 p-4 bg-green-50/50 rounded-xl border border-green-100">
+                                    <span class="text-green-600 text-xl font-black">✓</span>
+                                    <span class="text-sm font-bold text-green-800 uppercase tracking-tight">Accesibilidad AA (WCAG)</span>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section id="1A" class="scroll-mt-24 p-8 border-2 border-slate-100 rounded-3xl bg-white shadow-sm">
+                            <div class="flex justify-between items-start mb-6">
+                                <div>
+                                    <h4 class="text-2xl font-black text-slate-900 mb-1">Solicitud DT (1A)</h4>
+                                    <p class="text-sm font-bold text-slate-400 uppercase tracking-widest pl-1">Formalización Académica</p>
+                                </div>
+                                <div class="bg-slate-100 text-slate-700 p-2 rounded-xl text-xs font-bold font-black">HITO 1A</div>
+                            </div>
+                            <p class="text-slate-600 mb-4">Se solicita la validación del Director de Título, <strong>${proyecto.dt}</strong>, para iniciar la fase de diseño pedagógico.</p>
+                        </section>
+
+                        <section id="1B" class="scroll-mt-24 p-8 border-2 border-slate-100 rounded-3xl bg-white shadow-sm">
+                            <div class="flex justify-between items-start mb-6">
+                                <div>
+                                    <h4 class="text-2xl font-black text-slate-900 mb-1">Presupuestos (1B)</h4>
+                                    <p class="text-sm font-bold text-slate-400 uppercase tracking-widest pl-1">Validación Financiera</p>
+                                </div>
+                                <div class="bg-emerald-100 text-emerald-700 p-2 rounded-xl text-xs font-bold font-black">HITO 1B</div>
+                            </div>
+                            <p class="text-slate-600 mb-4">Estado de la dotación presupuestaria: <strong>Aprobado para ejecución</strong>.</p>
+                        </section>
+
+                        <section id="1D" class="scroll-mt-24 p-8 border-2 border-slate-100 rounded-3xl bg-white shadow-sm">
+                            <div class="flex justify-between items-start mb-6">
+                                <div>
+                                    <h4 class="text-2xl font-black text-purple-900 mb-1">5. Cronograma de Integración PR00-1 (1D)</h4>
+                                    <p class="text-sm font-bold text-purple-400 uppercase tracking-widest">Planificación Temporal para ${proyecto.codigo}</p>
+                                </div>
+                                <span class="bg-purple-50 text-purple-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">Timeline 6 Meses</span>
+                            </div>
+                            <div class="overflow-hidden rounded-2xl border border-slate-100">
+                                <table class="w-full text-left border-collapse">
+                                    <thead class="bg-slate-50 font-black text-xs text-slate-500 uppercase tracking-widest">
+                                        <tr>
+                                            <th class="p-4">Fase</th>
+                                            <th class="p-4">Hitos Clave</th>
+                                            <th class="p-4">Entrega</th>
+                                            <th class="p-4 text-right">Efecto</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100 text-sm">
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-4 font-bold">FASE 1-2</td>
+                                            <td class="p-4">A - B</td>
+                                            <td class="p-4">Mes 1</td>
+                                            <td class="p-4 text-right font-black text-orange-400">Alta y Onboarding</td>
+                                        </tr>
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-4 font-bold">FASE 4</td>
+                                            <td class="p-4">E - F</td>
+                                            <td class="p-4">Mes 3</td>
+                                            <td class="p-4 text-right font-black text-fuchsia-600">Desarrollo y QA</td>
+                                        </tr>
+                                        <tr class="hover:bg-slate-50/50">
+                                            <td class="p-4 font-bold">FASE 5</td>
+                                            <td class="p-4">G - M</td>
+                                            <td class="p-4">Mes 5</td>
+                                            <td class="p-4 text-right font-black text-orange-400">Maquetación Fin</td>
+                                        </tr>
+                                        <tr class="hover:bg-slate-50/50 bg-orange-50/30">
+                                            <td class="p-4 font-bold">FASE 6</td>
+                                            <td class="p-4">N - O</td>
+                                            <td class="p-4">Mes 6</td>
+                                            <td class="p-4 text-right font-black text-emerald-600">Publicación</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+                `
+            },
+            'D2': {
+                id: 'D2',
+                nombre: 'DOSSIER II: Contratación y Alta (Fase 2-3)',
+                fase: 'FORMALIZACIÓN / ONBOARDING',
+                secciones: [
+                    { id: '2A', hitoId: '2A', titulo: 'Alta Técnica', sub: 'Activación en Mindsmith', esPrincipal: true },
+                    { id: '2D', hitoId: 'A', titulo: 'Correo de Bienvenida', sub: 'Hito A - Inicio Oficial', esPrincipal: true },
+                    { id: '2F', hitoId: 'B', titulo: 'Acta Onboarding', sub: 'Reunión de Lanzamiento', esPrincipal: true },
+                    { id: '3B', hitoId: 'C', titulo: 'Propuesta Económica', sub: 'Detalles Contractuales', esPrincipal: true },
+                    { id: '3C', hitoId: '3C', titulo: 'Aprobación Autor', sub: 'Firma de Conformidad', esPrincipal: true }
+                ],
+                contenido: (proyecto) => `
+                    <div class="space-y-16">
+                        <section id="2A" class="scroll-mt-24 p-10 border-2 border-orange-50 rounded-[2.5rem] bg-white shadow-xl shadow-orange-600/5">
+                            <div class="flex justify-between items-start mb-8">
+                                <div>
+                                    <h4 class="text-3xl font-black text-slate-900 mb-1">1. Acta de Alta Técnica del Proyecto (2A)</h4>
+                                    <p class="text-sm font-bold text-orange-400 uppercase tracking-widest leading-none">Configuración de Entorno de Desarrollo</p>
+                                </div>
+                                <div class="bg-orange-400 text-white p-3 rounded-2xl shadow-lg shadow-orange-200">🛠️</div>
+                            </div>
+                            <div class="prose prose-slate max-w-none text-slate-600">
+                                <p>Se confirma la creación satisfactoria del espacio de trabajo en Mindsmith para el proyecto <strong>${proyecto.codigo}</strong>. 
+                                Se han asignado los activos de marca corporativos (tipografías, paleta HSL, iconos) y los permisos de edición necesarios para <strong>${proyecto.autor}</strong>.</p>
+                                <div class="mt-8 flex gap-4">
+                                    <div class="flex-1 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                        <div class="text-[10px] font-black text-slate-400 uppercase mb-1">Estado de Servidor</div>
+                                        <div class="font-bold text-emerald-600 flex items-center gap-2">● En Línea</div>
+                                    </div>
+                                    <div class="flex-1 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                        <div class="text-[10px] font-black text-slate-400 uppercase mb-1">Permisos de Autor</div>
+                                        <div class="font-bold text-orange-400 flex items-center gap-2">● Editor Senior</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section id="2D" class="scroll-mt-24 p-10 border-2 border-orange-50 rounded-[2.5rem] bg-orange-50/10">
+                            <div class="flex justify-between items-start mb-8">
+                                <div>
+                                    <h4 class="text-3xl font-black text-orange-600 mb-1">2. Bienvenida al Hito A (2D)</h4>
+                                    <p class="text-sm font-bold text-orange-400 uppercase tracking-widest leading-none">Comunicación Oficial de Lanzamiento</p>
+                                </div>
+                                <div class="bg-orange-400 text-white p-3 rounded-2xl">📧</div>
+                            </div>
+                            <div class="bg-white p-8 rounded-3xl border-2 border-orange-50 shadow-inner italic text-orange-600 leading-loose">
+                                <p class="mb-4">Estimado/a ${proyecto.autor},</p>
+                                <p>Nos es grato comunicarle que su entorno de trabajo ya está plenamente operativo. Con este envío, se inicia oficialmente el **Hito A** de su cronograma.</p>
+                                <p>Dispone de acceso inmediato a las guías metodológicas para asegurar que el contenido cumpla con los estándares de calidad universitaria. Su Director de Título, <strong>${proyecto.dt}</strong>, está a su disposición para la validación de la primera estructura pedagógica.</p>
+                            </div>
+                        </section>
+
+                        <section id="2F" class="scroll-mt-24 p-10 border-2 border-amber-50 rounded-[2.5rem] bg-white">
+                            <div class="flex justify-between items-start mb-8">
+                                <div>
+                                    <h4 class="text-3xl font-black text-slate-900 mb-1">3. Acta de Reunión Onboarding (2F)</h4>
+                                    <p class="text-sm font-bold text-amber-600 uppercase tracking-widest leading-none">Sincronización de Metodología y Herramientas</p>
+                                </div>
+                                <div class="bg-amber-500 text-white p-3 rounded-2xl">🤝</div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div class="space-y-4">
+                                    <p class="text-sm text-slate-500">Se ha celebrado la sesión inicial de coordinación con los siguientes puntos clave:</p>
+                                    <ul class="space-y-2 text-sm font-bold text-slate-700 list-none p-0">
+                                        <li class="flex items-center gap-2">🔘 Presentación del Entorno Mindsmith</li>
+                                        <li class="flex items-center gap-2">🔘 Explicación de Normativa WCAG 2.1</li>
+                                        <li class="flex items-center gap-2">🔘 Validación de Calendario de Hitos</li>
+                                    </ul>
+                                </div>
+                                <div class="bg-amber-50 p-6 rounded-3xl border border-amber-100 flex flex-col justify-center text-center">
+                                    <div class="text-[10px] font-black text-amber-800 uppercase mb-2">Compromiso Adquirido</div>
+                                    <div class="text-xl font-black text-amber-900 leading-tight">ENTREGA DE PRIMERA MUESTRA EN HITO E</div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section id="3B" class="scroll-mt-24 p-10 border-2 border-slate-100 rounded-[2.5rem] bg-slate-50">
+                            <div class="flex justify-between items-start mb-8">
+                                <div>
+                                    <h4 class="text-3xl font-black text-slate-900 mb-1">Propuesta Económica (3B)</h4>
+                                    <p class="text-sm font-bold text-slate-400 uppercase tracking-widest">Hito C - Detalles Contractuales</p>
+                                </div>
+                                <div class="bg-slate-700 text-white p-3 rounded-2xl">💰</div>
+                            </div>
+                            <div class="prose prose-slate max-w-none text-slate-600">
+                                <p>Se detalla la asignación presupuestaria para la elaboración del manual <strong>${proyecto.codigo}</strong> conforme a lo estipulado en el convenio marco de colaboración docente.</p>
+                            </div>
+                        </section>
+
+                        <section id="3C" class="scroll-mt-24 p-12 bg-orange-600 text-white rounded-[3rem] text-center">
+                            <h4 class="text-4xl font-black mb-4">Aprobación del Autor (3C)</h4>
+                            <p class="opacity-70 mb-8 max-w-lg mx-auto">Certifico mi conformidad con los términos económicos y el cronograma de entregas presentado.</p>
+                            <div class="inline-block px-10 py-4 border-2 border-orange-400 rounded-2xl font-black uppercase tracking-widest">
+                                Firmado por: ${proyecto.autor}
+                            </div>
+                        </section>
+                    </div>
+                `
+            },
+            'D3': {
+                id: 'D3',
+                nombre: 'DOSSIER III: Desarrollo y Calidad (Fase 4)',
+                fase: 'PRODUCCIÓN ACADÉMICA / QA',
+                secciones: [
+                    { id: '4A', hitoId: 'E', titulo: 'Diseño Estructural', sub: 'Arquitectura Pedagógica' },
+                    { id: '4C', hitoId: 'E', titulo: 'Envío de Muestras', sub: 'Hito E - Control SAD', esPrincipal: true },
+                    { id: '4D', hitoId: 'F', titulo: 'Informe de Calidad', sub: 'Hito F - Feedback Técnico', esPrincipal: true },
+                    { id: '4G', hitoId: 'D', titulo: 'Validación Académica', sub: 'Hito D - Cierre Autor', esPrincipal: true },
+                    { id: '4H', hitoId: 'D', titulo: 'Visto Bueno DT', sub: 'Aceptación Final Dirección', esPrincipal: true }
+                ],
+                contenido: (proyecto) => `
+                    <div class="space-y-16">
+                        <section id="4A" class="scroll-mt-24 p-12 border-2 border-orange-50 rounded-[3rem] bg-white shadow-2xl shadow-orange-600/5">
+                            <div class="flex flex-col md:flex-row justify-between gap-6 mb-10">
+                                <div>
+                                    <h4 class="text-4xl font-black text-slate-900 tracking-tighter mb-1">Diseño Estructural (4A)</h4>
+                                    <p class="text-sm font-black text-orange-400 uppercase tracking-widest pl-1">Arquitectura de Contenidos Interactivos</p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <span class="h-10 px-4 bg-orange-100 text-orange-600 rounded-full flex items-center font-bold text-xs uppercase">Estructura AA</span>
+                                    <span class="h-10 px-4 bg-slate-900 text-white rounded-full flex items-center font-bold text-xs uppercase">PR00-1</span>
+                                </div>
+                            </div>
+                            
+                            <!-- INTEGRACIÓN GUÍA EXPLÍCITA PARA AUTORES -->
+                            <div class="mb-12 space-y-12">
+                                <section id="G0" class="scroll-mt-24 p-10 border-2 border-orange-100 rounded-[2rem] bg-orange-600 text-white shadow-xl">
+                                    <div class="flex flex-col md:flex-row gap-8 items-center">
+                                        <div class="flex-1">
+                                            <h4 class="text-3xl font-black mb-4">Bienvenido a Mindsmith</h4>
+                                            <p class="text-orange-200 text-lg mb-6 leading-relaxed">
+                                                Descubre en menos de 2 minutos cómo transformar tu material docente en una experiencia de aprendizaje interactiva de alto impacto.
+                                            </p>
+                                            <div class="flex gap-4">
+                                                <div class="px-4 py-2 bg-white/10 rounded-lg text-sm font-bold backdrop-blur-sm">🎥 Tutorial Rápido</div>
+                                                <div class="px-4 py-2 bg-white/10 rounded-lg text-sm font-bold backdrop-blur-sm">⏱️ 1:45 min</div>
+                                            </div>
+                                        </div>
+                                        <div class="flex-1 w-full aspect-video bg-slate-900 rounded-xl overflow-hidden shadow-2xl relative border border-white/20">
+                                            <video controls class="w-full h-full object-cover">
+                                                <source src="./Mindsmith.mp4" type="video/mp4" />
+                                                Tu navegador no soporta el elemento de video.
+                                            </video>
+                                            <div class="absolute bottom-4 left-4 text-xs font-bold uppercase tracking-widest text-white/50 pointer-events-none">Mindsmith Local Video</div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section id="G1" class="scroll-mt-24 p-10 border-2 border-orange-100 rounded-[2rem] bg-orange-50/20">
+                                    <h4 class="text-3xl font-black text-orange-600 mb-6">1. Checklist Maestro de Entrega</h4>
+                                    <div class="space-y-4">
+                                        <div class="flex items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-orange-50">
+                                            <input type="checkbox" class="w-6 h-6 text-orange-400 rounded focus:ring-orange-400 border-gray-300" />
+                                            <label class="font-bold text-gray-700">12 Unidades Completas (Teoría + Práctica)</label>
+                                        </div>
+                                        <div class="flex items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-orange-50">
+                                            <input type="checkbox" class="w-6 h-6 text-orange-400 rounded focus:ring-orange-400 border-gray-300" />
+                                            <label class="font-bold text-gray-700">Evaluación Final (50 preguntas banco)</label>
+                                        </div>
+                                        <div class="flex items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-orange-50">
+                                            <input type="checkbox" class="w-6 h-6 text-orange-400 rounded focus:ring-orange-400 border-gray-300" />
+                                            <label class="font-bold text-gray-700">Glosario (Mínimo 20 términos)</label>
+                                        </div>
+                                        <div class="flex items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-orange-50">
+                                            <input type="checkbox" class="w-6 h-6 text-orange-400 rounded focus:ring-orange-400 border-gray-300" />
+                                            <label class="font-bold text-gray-700">Bibliografía Actualizada (APA 7)</label>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section id="G2" class="scroll-mt-24 p-10 border-2 border-slate-200 rounded-[2rem] bg-white">
+                                    <h4 class="text-3xl font-black text-slate-900 mb-6">2. Estructura Obligatoria de Unidad</h4>
+                                    <div class="grid md:grid-cols-2 gap-8">
+                                        <div class="p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                                            <h5 class="font-black text-orange-400 uppercase mb-4 tracking-widest text-sm">Componentes</h5>
+                                            <ul class="space-y-2 text-sm text-slate-700">
+                                                <li class="font-bold">• Introducción (Vídeo/Texto)</li>
+                                                <li class="font-bold">• Objetivos de Aprendizaje</li>
+                                                <li>• Desarrollo Teórico (3-5 Pantallas)</li>
+                                                <li>• Casos Prácticos</li>
+                                                <li class="font-bold">• Autoevaluación (Test 5 preguntas)</li>
+                                                <li>• Resumen / Conclusiones</li>
+                                            </ul>
+                                        </div>
+                                        <div class="p-6 bg-orange-50 rounded-2xl border border-orange-100">
+                                            <h5 class="font-black text-orange-400 uppercase mb-4 tracking-widest text-sm">Restricciones Técnicas</h5>
+                                            <p class="text-sm text-slate-700 leading-relaxed">
+                                                El texto por pantalla no puede exceder las <strong>300 palabras</strong>.
+                                                Se debe priorizar el uso de recursos interactivos (acordeones, tabs, carruseles) frente a los bloques de texto plano largos.
+                                                Los vídeos no deben superar los <strong>5 minutos</strong> de duración.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section id="G3" class="scroll-mt-24 p-10 border-2 border-orange-100 rounded-[2rem] bg-white">
+                                    <h4 class="text-3xl font-black text-orange-600 mb-6">3. Recursos Gráficos</h4>
+                                    <p class="mb-6 text-slate-600">Todas las imágenes deben ser propias o de banco de imágenes con licencia comercial explícita.</p>
+                                    <div class="grid grid-cols-3 gap-4 text-center">
+                                        <div class="p-4 bg-orange-50 rounded-xl">
+                                            <div class="text-2xl font-black text-orange-400 mb-2">JPG</div>
+                                            <div class="text-xs font-bold text-orange-800">Fotografías</div>
+                                        </div>
+                                        <div class="p-4 bg-orange-50 rounded-xl">
+                                            <div class="text-2xl font-black text-orange-400 mb-2">PNG</div>
+                                            <div class="text-xs font-bold text-orange-800">Gráficos / Iconos</div>
+                                        </div>
+                                        <div class="p-4 bg-orange-50 rounded-xl">
+                                            <div class="text-2xl font-black text-orange-400 mb-2">SVG</div>
+                                            <div class="text-xs font-bold text-orange-800">Vectores</div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section id="G4" class="scroll-mt-24 p-10 border-2 border-emerald-100 rounded-[2rem] bg-emerald-50/10">
+                                    <h4 class="text-3xl font-black text-emerald-900 mb-6">4. Accesibilidad (WCAG 2.1)</h4>
+                                    <div class="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm">
+                                        <ul class="list-disc list-inside space-y-3 text-slate-700">
+                                            <li><strong>Texto Alternativo (Alt Text):</strong> Obligatorio para todas las imágenes no decorativas.</li>
+                                            <li><strong>Contraste:</strong> Respetar la paleta de colores del proyecto, ya validada para contraste AA.</li>
+                                            <li><strong>Jerarquía:</strong> Uso correcto de encabezados (H1, H2, H3) sin saltar niveles.</li>
+                                            <li><strong>Enlaces:</strong> Textos de enlace descriptivos (evitar "pinche aquí").</li>
+                                        </ul>
+                                    </div>
+                                </section>
+                            </div>
+
+                            <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                                <div class="lg:col-span-12 prose prose-orange max-w-none text-slate-600 leading-relaxed text-lg">
+                                    <p>Para garantizar una experiencia de aprendizaje óptima, el manual de <strong>${proyecto.nombre}</strong> debe articularse sobre una jerarquía lógica de 12 unidades académicas. 
+                                    Cada unidad incluirá obligatoriamente: un vídeo de presentación, tres pantallas de contenido teórico, una actividad práctica de autoevaluación y un glosario de términos técnicos.</p>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section id="4D" class="scroll-mt-24 p-12 border-2 border-rose-50 rounded-[3rem] bg-rose-50/5">
+                            <div class="flex justify-between items-center mb-10">
+                                <div>
+                                    <h4 class="text-3xl font-black text-slate-900 mb-1">Informe de Revisión SAE (4D)</h4>
+                                    <p class="text-sm font-bold text-rose-500 uppercase tracking-widest pl-1">Control de Calidad y Feedback Técnico</p>
+                                </div>
+                                <div class="bg-rose-600 text-white text-xs font-black px-4 py-2 rounded-xl">HITO F ACTIVO</div>
+                            </div>
+                            <div class="bg-white p-8 rounded-[2rem] border-2 border-rose-50 shadow-inner">
+                                <div class="flex items-center gap-6 mb-8 p-4 bg-rose-50 rounded-2xl">
+                                    <div class="w-16 h-16 bg-rose-600 rounded-2xl flex items-center justify-center text-3xl shadow-lg">🔍</div>
+                                    <div>
+                                        <div class="text-xl font-black text-rose-900">PENDIENTE DE AJUSTE</div>
+                                        <div class="text-sm font-bold text-rose-500 uppercase">Se requiere intervención del autor en Unidades 3 y 7</div>
+                                    </div>
+                                </div>
+                                <div class="space-y-4 text-slate-700">
+                                    <div class="flex gap-4">
+                                        <span class="font-black text-rose-600">⚠</span>
+                                        <p><strong>Accesibilidad:</strong> Faltan textos alternativos en las infografías de la Unidad 3.</p>
+                                    </div>
+                                    <div class="flex gap-4">
+                                        <span class="font-black text-rose-600">⚠</span>
+                                        <p><strong>Hipervínculos:</strong> Se detectan 3 enlaces rotos a la biblioteca externa en la Unidad 7.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section id="4C" class="scroll-mt-24 p-10 border-2 border-sky-100 rounded-[2.5rem] bg-sky-50/20">
+                            <div class="flex justify-between items-center mb-6">
+                                <h4 class="text-2xl font-black text-sky-900">Envío de Muestras (4C)</h4>
+                                <span class="bg-sky-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase">Hito E</span>
+                            </div>
+                            <p class="text-slate-600 italic">Carga de la muestra inicial de contenidos en Mindsmith para validación previa por el equipo de calidad.</p>
+                        </section>
+
+                        <section id="4G" class="scroll-mt-24 p-10 border-2 border-emerald-100 rounded-[2.5rem] bg-emerald-50/20">
+                            <div class="flex justify-between items-center mb-6">
+                                <h4 class="text-2xl font-black text-emerald-900">Validación Académica (4G)</h4>
+                                <span class="bg-emerald-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase">Hito D</span>
+                            </div>
+                            <p class="text-slate-600 italic">Cierre del periodo de producción autor. El manual está listo para la revisión final del DT.</p>
+                        </section>
+
+                        <section id="4H" class="scroll-mt-24 p-12 bg-emerald-950 rounded-[4rem] text-white shadow-3xl shadow-emerald-950/20 overflow-hidden relative">
+                            <div class="absolute top-0 right-0 w-64 h-64 bg-emerald-400 opacity-10 rounded-full blur-3xl -mr-20 -mt-20"></div>
+                            <div class="relative z-10 text-center py-8">
+                                <div class="inline-block bg-emerald-400 text-emerald-950 text-[10px] font-black px-4 py-1.5 rounded-full mb-6 tracking-widest uppercase">Validación Final de Dirección Académica</div>
+                                <h4 class="text-5xl font-black tracking-tighter mb-4 leading-none">Visto Bueno de Hito D</h4>
+                                <div class="max-w-2xl mx-auto opacity-70 text-lg mb-10 font-medium">
+                                    Certifico que el contenido de la asignatura <strong>${proyecto.codigo}</strong> cumple con todos los requisitos pedagógicos y técnicos establecidos por nuestra institución.
+                                </div>
+                                <div class="inline-flex items-center gap-4 bg-white/10 p-6 rounded-3xl backdrop-blur-md border border-white/20">
+                                    <div class="text-left">
+                                        <div class="text-[10px] font-bold opacity-50 uppercase mb-1">Director/a de Título</div>
+                                        <div class="text-2xl font-black tracking-tight tracking-tight leading-none">${proyecto.dt}</div>
+                                    </div>
+                                    <div class="w-px h-10 bg-white/20 mx-2"></div>
+                                    <div class="text-3xl">📝</div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                `
+            },
+            'D4': {
+                id: 'D4',
+                nombre: 'DOSSIER IV: Producción y Cierre (Fase 5-6)',
+                fase: 'MAQUETACIÓN / PUBLICACIÓN',
+                secciones: [
+                    { id: 'E1', hitoId: 'G', titulo: 'Entrega Proveedor', sub: 'Paso a Producción Externa', esPrincipal: true },
+                    { id: '5B', hitoId: 'H', titulo: 'Audit. Accesibilidad', sub: 'Hito H - Revisión Final', esPrincipal: true },
+                    { id: 'L1', hitoId: 'L', titulo: 'Rev. Funcional SCORM', sub: 'Hito L - QA Técnico', esPrincipal: true },
+                    { id: 'F2', hitoId: 'O', titulo: 'Manual Operativo', sub: 'Cierre Total del Proyecto', esPrincipal: true }
+                ],
+                contenido: (proyecto) => `
+                    <div class="space-y-16 text-left">
+                        <section id="E1" class="scroll-mt-24 p-10 border-2 border-orange-100 rounded-[3rem] bg-white">
+                            <div class="flex justify-between items-start mb-8">
+                                <div>
+                                    <h4 class="text-3xl font-black text-slate-900 mb-1">Notificación a Proveedor (E1)</h4>
+                                    <p class="text-sm font-bold text-orange-400 uppercase tracking-widest pl-1">Transferencia de Activos para Maquetación</p>
+                                </div>
+                                <div class="bg-orange-400 text-white font-black px-4 py-2 rounded-xl text-xs">HITO G</div>
+                            </div>
+                            <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100 font-mono text-sm space-y-2">
+                                <p class="text-slate-400 italic">// Protocolo de Transferencia SCORM</p>
+                                <p><span class="text-orange-400">ID_PROYECTO:</span> ${proyecto.codigo}</p>
+                                <p><span class="text-orange-400">CONTENEDOR:</span> Mindsmith_Cloud_V4</p>
+                                <p><span class="text-orange-400">ENTREGA_ESTIMADA:</span> +15 días laborables</p>
+                            </div>
+                        </section>
+
+                        <section id="5B" class="scroll-mt-24 p-12 bg-white border-2 border-green-50 rounded-[3rem] shadow-sm">
+                            <div class="flex justify-between items-start mb-6">
+                                <div>
+                                    <h4 class="text-3xl font-black text-slate-900 mb-1">Audit. Accesibilidad (5B)</h4>
+                                    <p class="text-sm font-bold text-green-600 uppercase tracking-widest font-black">Hito H - Revisión Final de Calidad</p>
+                                </div>
+                                <div class="bg-green-100 text-green-700 px-4 py-2 rounded-2xl text-xs font-black">CUMPLIMIENTO AA+</div>
+                            </div>
+                            <p class="text-slate-600 italic">El manual ha superado las pruebas de contraste, navegación por teclado y descriptores de imagen según la normativa WCAG 2.1.</p>
+                        </section>
+
+                        <section id="L1" class="scroll-mt-24 p-12 bg-slate-900 text-white rounded-[3rem] shadow-2xl">
+                            <div class="flex justify-between items-start mb-6">
+                                <div>
+                                    <h4 class="text-3xl font-black mb-1">Rev. Funcional SCORM (L1)</h4>
+                                    <p class="text-sm font-bold text-orange-400 uppercase tracking-widest font-black">Hito L - QA Técnico y Empaquetado</p>
+                                </div>
+                                <div class="bg-orange-400 text-white px-4 py-2 rounded-2xl text-xs font-black">ESTADO: VALIDADO</div>
+                            </div>
+                            <p class="opacity-70 italic text-lg">Pruebas de comunicación LMS-API completadas con éxito. Seguimiento de tiempo y puntajes operativo.</p>
+                        </section>
+
+                        <section id="F2" class="scroll-mt-24">
+                            <div class="p-1 text-center mb-4">
+                                <div class="inline-block bg-orange-50 text-orange-600 text-[10px] font-black px-4 py-1 rounded-full tracking-widest uppercase">Hito Final O Alcanzado</div>
+                            </div>
+                            <div class="p-16 bg-gradient-to-br from-orange-400 via-orange-600 to-purple-800 text-white rounded-[4rem] text-center shadow-3xl shadow-orange-200 relative overflow-hidden">
+                                <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+                                <div class="relative z-10">
+                                    <div class="text-6xl mb-8">🚀</div>
+                                    <h4 class="text-6xl font-black tracking-tighter mb-4 leading-none">Cierre Operativo Exitoso</h4>
+                                    <p class="text-xl opacity-80 font-medium max-w-xl mx-auto mb-12">
+                                        El manual <strong>${proyecto.nombre}</strong> ha sido cargado en el LMS y validado funcionalmente. Se libera el hito de pago final para el autor.
+                                    </p>
+                                    <div class="inline-flex gap-8 text-left">
+                                        <div>
+                                            <div class="text-[10px] font-black opacity-40 uppercase mb-1">Versión Final</div>
+                                            <div class="text-2xl font-black">${proyecto.version || 'v1.0.0-PROD'}</div>
+                                        </div>
+                                        <div class="w-px h-10 bg-white/20"></div>
+                                        <div>
+                                            <div class="text-[10px] font-black opacity-40 uppercase mb-1">Publicación</div>
+                                            <div class="text-2xl font-black">${new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                `
+            }
+        };
+
+        function App() {
+            const [autores, setAutores] = useState(() => {
+                const saved = localStorage.getItem('mindsmith_autores');
+                return saved ? JSON.parse(saved) : [
+                    { id: 'auth-1', nombreCompleto: 'Pérez García, Juan', email: 'juan.perez@universidad.edu', tipo: 'interno', estado: 'activo', createdAt: new Date().toISOString() },
+                    { id: 'auth-2', nombreCompleto: 'López Sanz, Marta', email: 'marta.lopez@externo.edu', tipo: 'externo', estado: 'activo', createdAt: new Date().toISOString() }
+                ];
+            });
+
+            const [dts, setDts] = useState(() => {
+                const saved = localStorage.getItem('mindsmith_dts');
+                return saved ? JSON.parse(saved) : [
+                    { id: 'dt-1', nombreCompleto: 'Dr. Fernando Arnal', email: 'f.arnal@universidad.edu', facultad: 'IA y Computación', estado: 'activo', createdAt: new Date().toISOString() }
+                ];
+            });
+
+            const [proyectos, setProyectos] = useState(() => {
+                const saved = localStorage.getItem('mindsmith_proyectos');
+                if (saved) return JSON.parse(saved);
+                return PROYECTOS.map(p => ({
+                    ...p,
+                    projectId: p.id,
+                    nombreProyecto: `${p.nombre} – ${p.codigo}`,
+                    estadoProyecto: 'fase4',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                }));
+            });
+
+            const [projectAuthors, setProjectAuthors] = useState(() => {
+                const saved = localStorage.getItem('mindsmith_links_authors');
+                return saved ? JSON.parse(saved) : [
+                    { projectId: 'IA101', authorId: 'auth-1', rolEnProyecto: 'autor_principal', fechaAsignacion: new Date().toISOString(), estadoAsignacion: 'activa' },
+                    { projectId: 'PY202', authorId: 'auth-2', rolEnProyecto: 'autor_principal', fechaAsignacion: new Date().toISOString(), estadoAsignacion: 'activa' }
+                ];
+            });
+
+            const [projectDTs, setProjectDTs] = useState(() => {
+                const saved = localStorage.getItem('mindsmith_links_dts');
+                return saved ? JSON.parse(saved) : [
+                    { projectId: 'IA101', dtId: 'dt-1', rolEnProyecto: 'dt_principal', fechaAsignacion: new Date().toISOString(), estadoAsignacion: 'activa' },
+                    { projectId: 'PY202', dtId: 'dt-2', rolEnProyecto: 'dt_principal', fechaAsignacion: new Date().toISOString(), estadoAsignacion: 'activa' }
+                ];
+            });
+
+            const [acciones, setAcciones] = useState(() => {
+                const saved = localStorage.getItem('mindsmith_acciones');
+                return saved ? JSON.parse(saved) : [];
+            });
+
+            const [tareas, setTareas] = useState(() => {
+                const saved = localStorage.getItem('mindsmith_tareas');
+                if (saved) return JSON.parse(saved);
+                return [{
+                    id: Date.now(),
+                    proyecto: 'IA101',
+                    texto: 'Solicitar firma/aceptación 0B al autor',
+                    prioridad: 'Alta',
+                    estado: 'pendiente',
+                    fecha: new Date().toLocaleDateString('es-ES')
+                }];
+            });
+
+            const [vistaActual, setVistaActual] = useState('inicio');
+            const [busqueda, setBusqueda] = useState('');
+
+            // Filtrado global de proyectos
+            const proyectosFiltrados = proyectos.filter(p =>
+                p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+                p.codigo.toLowerCase().includes(busqueda.toLowerCase()) ||
+                p.autor.toLowerCase().includes(busqueda.toLowerCase()) ||
+                p.dt.toLowerCase().includes(busqueda.toLowerCase())
+            );
+
+            // Ensure selected project refers to the one in the state, not the initial copy
+            const [selectedId, setSelectedId] = useState(PROYECTOS[0].id);
+
+            const proyectoSeleccionado = proyectos.find(p => p.id === selectedId) || proyectos[0];
+            const setProyectoSeleccionado = (p) => setSelectedId(p.id);
+
+            const [plantillaActiva, setPlantillaActiva] = useState('D1');
+            const [seccionActiva, setSeccionActiva] = useState('0A');
+            const [dirHandle, setDirHandle] = useState(null);
+
+            // Función para conectar directamente a la carpeta (MODO SIN SERVIDOR)
+            const conectarCarpetaLocal = async () => {
+                try {
+                    const handle = await window.showDirectoryPicker({
+                        mode: 'readwrite'
+                    });
+                    setDirHandle(handle);
+                    setSyncStatus('connected_direct');
+
+                    // Cargar datos inmediatamente después de conectar
+                    const data = {
+                        autores: await leerExcelDirecto(handle, 'Autores_Mindsmith.xlsx'),
+                        dts: await leerExcelDirecto(handle, 'DTs_Mindsmith.xlsx'),
+                        proyectos: await leerExcelDirecto(handle, 'Asignaturas_Mindsmith.xlsx'),
+                        links_authors: await leerExcelDirecto(handle, 'Vinculos_Autores.xlsx'),
+                        links_dts: await leerExcelDirecto(handle, 'Vinculos_DTs.xlsx'),
+                    };
+
+                    if (data.autores) setAutores(data.autores);
+                    if (data.dts) setDts(data.dts);
+                    if (data.proyectos) setProyectos(data.proyectos);
+                    if (data.links_authors) setProjectAuthors(data.links_authors);
+                    if (data.links_dts) setProjectDTs(data.links_dts);
+
+                    alert("✅ Carpeta conectada correctamente. Los cambios se guardarán directamente en los archivos Excel.");
+                } catch (err) {
+                    console.error("Error al acceder a la carpeta:", err);
+                    if (err.name !== 'AbortError') {
+                        alert("Error: Para usar el modo directo, necesitas un navegador moderno (Chrome/Edge) y dar permisos a la carpeta.");
+                    }
+                }
+            };
+
+            const leerExcelDirecto = async (handle, filename) => {
+                try {
+                    const fileHandle = await handle.getFileHandle(filename);
+                    const file = await fileHandle.getFile();
+                    const arrayBuffer = await file.arrayBuffer();
+                    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                    const sheetName = workbook.SheetNames[0];
+                    return XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                } catch (e) {
+                    console.warn(`No se pudo leer ${filename} directamente.`, e);
+                    return null;
+                }
+            };
+
+            const guardarExcelDirecto = async (handle, filename, data) => {
+                try {
+                    const fileHandle = await handle.getFileHandle(filename, { create: true });
+                    const writable = await fileHandle.createWritable();
+                    const worksheet = XLSX.utils.json_to_sheet(data);
+                    const workbook = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(workbook, worksheet, 'Datos');
+                    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+                    await writable.write(excelBuffer);
+                    await writable.close();
+                    console.log(`Guardado directo OK: ${filename}`);
+                } catch (e) {
+                    console.error(`Error guardando ${filename} directamente:`, e);
+                }
+            };
+
+            const [vistaDbTab, setVistaDbTab] = useState('autores');
+
+            // Sincronización con Servidor Local (Excel)
+            const syncWithLocalServer = async (entity, data, filename) => {
+                try {
+                    const response = await fetch('http://localhost:3001/api/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ filename, data })
+                    });
+                    if (response.ok) {
+                        console.log(`Sync OK: ${filename}`);
+                        setSyncStatus('connected');
+                    } else {
+                        setSyncStatus('error');
+                    }
+                } catch (err) {
+                    console.warn("Servidor de sincronización local no detectado.");
+                    setSyncStatus('disconnected');
+                }
+            };
+
+            const [syncStatus, setSyncStatus] = useState('checking');
+
+            // Carga inicial desde Servidor (Modo Node.js)
+            React.useEffect(() => {
+                const loadInitialData = async () => {
+                    try {
+                        const response = await fetch('http://localhost:3001/api/load-all');
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data.autores && data.autores.length > 0) setAutores(data.autores);
+                            if (data.dts && data.dts.length > 0) setDts(data.dts);
+                            if (data.proyectos && data.proyectos.length > 0) setProyectos(data.proyectos);
+                            if (data.links_authors && data.links_authors.length > 0) setProjectAuthors(data.links_authors);
+                            if (data.links_dts && data.links_dts.length > 0) setProjectDTs(data.links_dts);
+                            setSyncStatus('connected');
+                            console.log("Datos sincronizados desde Excel (Modo Servidor)");
+                        }
+                    } catch (err) {
+                        setSyncStatus('disconnected');
+                        console.log("Servidor offline, esperando conexión manual o local.");
+                    }
+                };
+                loadInitialData();
+            }, []);
+
+            // Persistencia Expandida + Auto-Sync
+            React.useEffect(() => {
+                localStorage.setItem('mindsmith_autores', JSON.stringify(autores));
+                localStorage.setItem('mindsmith_dts', JSON.stringify(dts));
+                localStorage.setItem('mindsmith_proyectos', JSON.stringify(proyectos));
+                localStorage.setItem('mindsmith_links_authors', JSON.stringify(projectAuthors));
+                localStorage.setItem('mindsmith_links_dts', JSON.stringify(projectDTs));
+                localStorage.setItem('mindsmith_acciones', JSON.stringify(acciones));
+                localStorage.setItem('mindsmith_tareas', JSON.stringify(tareas));
+
+                // Disparar sincronización a Excel
+                const debounceTimer = setTimeout(() => {
+                    if (syncStatus === 'connected_direct' && dirHandle) {
+                        // MODO DIRECTO (SIN SERVIDOR)
+                        guardarExcelDirecto(dirHandle, 'Autores_Mindsmith.xlsx', autores);
+                        guardarExcelDirecto(dirHandle, 'DTs_Mindsmith.xlsx', dts);
+                        guardarExcelDirecto(dirHandle, 'Asignaturas_Mindsmith.xlsx', proyectos);
+                        guardarExcelDirecto(dirHandle, 'Vinculos_Autores.xlsx', projectAuthors);
+                        guardarExcelDirecto(dirHandle, 'Vinculos_DTs.xlsx', projectDTs);
+                    } else if (syncStatus === 'connected') {
+                        // MODO SERVIDOR (NODE.JS)
+                        syncWithLocalServer('autores', autores, 'Autores_Mindsmith.xlsx');
+                        syncWithLocalServer('dts', dts, 'DTs_Mindsmith.xlsx');
+                        syncWithLocalServer('proyectos', proyectos, 'Asignaturas_Mindsmith.xlsx');
+                        syncWithLocalServer('links_authors', projectAuthors, 'Vinculos_Autores.xlsx');
+                        syncWithLocalServer('links_dts', projectDTs, 'Vinculos_DTs.xlsx');
+                    }
+                }, 1000);
+
+                return () => clearTimeout(debounceTimer);
+            }, [autores, dts, proyectos, projectAuthors, projectDTs, syncStatus, dirHandle]);
+
+            // Helpers para obtener nombres relacionales
+            const getAutoresProyecto = (projectId) => {
+                const links = projectAuthors.filter(l => l.projectId === projectId);
+                return links.map(l => {
+                    const a = autores.find(auth => auth.id === l.authorId);
+                    return a ? `${a.nombreCompleto} (${l.rolEnProyecto})` : 'Desconocido';
+                }).join(', ');
+            };
+
+            const getDTsProyecto = (projectId) => {
+                const links = projectDTs.filter(l => l.projectId === projectId);
+                return links.map(l => {
+                    const d = dts.find(dt => dt.id === l.dtId);
+                    return d ? `${d.nombreCompleto} (${l.rolEnProyecto})` : 'Desconocido';
+                }).join(', ');
+            };
+
+            const toggleHito = (proyectoId, hitoId) => {
+                setProyectos(prev => prev.map(p => {
+                    if (p.id !== proyectoId) return p;
+                    const hitos = p.hitosCompletados.includes(hitoId)
+                        ? p.hitosCompletados.filter(h => h !== hitoId)
+                        : [...p.hitosCompletados, hitoId];
+                    return { ...p, hitosCompletados: hitos };
+                }));
+            };
+
+            const agregarAutor = (data) => {
+                const authorId = `auth-${Date.now()}`;
+                const { asignatura, ...authorData } = data;
+                const nuevo = {
+                    id: authorId,
+                    nombreCompleto: authorData.nombreCompleto,
+                    email: authorData.email,
+                    tipo: authorData.tipo || 'interno',
+                    estado: authorData.estado || 'activo',
+                    createdAt: new Date().toISOString()
+                };
+                setAutores(prev => [...prev, nuevo]);
+
+                if (asignatura) {
+                    setProjectAuthors(prev => [...prev, {
+                        projectId: asignatura,
+                        authorId: authorId,
+                        rolEnProyecto: 'autor_principal',
+                        fechaAsignacion: new Date().toISOString(),
+                        estadoAsignacion: 'activa'
+                    }]);
+                }
+
+                setAcciones(prev => [...prev, { id: Date.now(), type: 'createRecord', payload: { entityType: 'authors', data: nuevo }, timestamp: new Date().toISOString() }]);
+            };
+
+            const agregarDT = (data) => {
+                const nuevo = { id: `dt-${Date.now()}`, ...data, createdAt: new Date().toISOString() };
+                setDts(prev => [...prev, nuevo]);
+                setAcciones(prev => [...prev, { id: Date.now(), type: 'createRecord', payload: { entityType: 'dts', data: nuevo }, timestamp: new Date().toISOString() }]);
+            };
+
+            const agregarProyecto = (data) => {
+                const nuevo = {
+                    id: `proj-${Date.now()}`,
+                    ...data,
+                    hitosCompletados: [],
+                    createdAt: new Date().toISOString(),
+                    inicio: new Date().toLocaleDateString()
+                };
+                setProyectos(prev => [...prev, nuevo]);
+                setAcciones(prev => [...prev, { id: Date.now(), type: 'createRecord', payload: { entityType: 'projects', data: nuevo }, timestamp: new Date().toISOString() }]);
+            };
+
+            const updateProyecto = (projectId, newData) => {
+                setProyectos(prev => prev.map(p => p.id === projectId ? { ...p, ...newData, updatedAt: new Date().toISOString() } : p));
+                setAcciones(prev => [...prev, { id: Date.now(), type: 'updateRecord', payload: { entityType: 'projects', recordId: projectId, data: newData }, timestamp: new Date().toISOString() }]);
+            };
+
+            const toggleTarea = (tareaId) => {
+                setTareas(prev => prev.map(t =>
+                    t.id === tareaId ? { ...t, estado: t.estado === 'pendiente' ? 'completada' : 'pendiente' } : t
+                ));
+            };
+
+
+            // --- CRM COPILOT ENGINE ---
+            const ejecutarAccion = (accion) => {
+                const { type, payload } = accion;
+                const timestamp = new Date().toISOString();
+
+                setAcciones(prev => [...prev, { ...accion, id: Date.now(), timestamp }]);
+
+                switch (type) {
+                    case 'createRecord':
+                        if (payload.entityType === 'authors') {
+                            setAutores(prev => [...prev, { ...payload.data, id: `auth-${Date.now()}`, createdAt: timestamp }]);
+                        } else if (payload.entityType === 'dts') {
+                            setDts(prev => [...prev, { ...payload.data, id: `dt-${Date.now()}`, createdAt: timestamp }]);
+                        } else if (payload.entityType === 'projects') {
+                            setProyectos(prev => [...prev, { ...payload.data, id: payload.data.codigo, projectId: payload.data.codigo, createdAt: timestamp, hitosCompletados: [] }]);
+                        }
+                        break;
+                    case 'updateRecord':
+                        if (payload.entityType === 'authors') {
+                            setAutores(prev => prev.map(a => a.id === payload.recordId ? { ...a, ...payload.data, updatedAt: timestamp } : a));
+                        } else if (payload.entityType === 'dts') {
+                            setDts(prev => prev.map(d => d.id === payload.recordId ? { ...d, ...payload.data, updatedAt: timestamp } : d));
+                        } else if (payload.entityType === 'projects') {
+                            setProyectos(prev => prev.map(p => p.id === payload.recordId ? { ...p, ...payload.data, updatedAt: timestamp } : p));
+                        }
+                        break;
+                    case 'linkRecords':
+                        if (payload.linkType === 'projectAuthors') {
+                            setProjectAuthors(prev => [...prev, { ...payload.data, fechaAsignacion: timestamp, estadoAsignacion: 'activa' }]);
+                        } else if (payload.linkType === 'projectDTs') {
+                            setProjectDTs(prev => [...prev, { ...payload.data, fechaAsignacion: timestamp, estadoAsignacion: 'activa' }]);
+                        }
+                        break;
+                    case 'updateStatus':
+                        setProyectos(prev => prev.map(p => p.id === payload.projectId ? { ...p, estadoProyecto: payload.estadoProyecto, updatedAt: timestamp } : p));
+                        break;
+                    case 'createTask':
+                        setTareas(prev => [...prev, {
+                            id: Date.now(),
+                            proyecto: payload.projectId,
+                            texto: payload.title,
+                            prioridad: 'Media',
+                            estado: 'pendiente',
+                            fecha: payload.dueDate || new Date().toLocaleDateString('es-ES')
+                        }]);
+                        break;
+                }
+            };
+
+            const procesarMensajeCopilot = (mensaje) => {
+                // Simulación de Lógica de Copilot basada en PRINCIPIOS
+                const msg = mensaje.toLowerCase();
+                let res = {
+                    intent: 'search',
+                    entities: { authors: [], dts: [], projects: [] },
+                    links: { projectAuthors: [], projectDTs: [] },
+                    validations: [],
+                    actions: [],
+                    status: 'COMPLETO',
+                    humano: ''
+                };
+
+                if (msg.includes('crea') && msg.includes('autor')) {
+                    const emailMatch = msg.match(/[a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+/);
+                    const nombreMatch = mensaje.match(/llamado ([^,.]+)/i);
+
+                    if (!emailMatch) {
+                        res.status = 'PENDIENTE';
+                        res.humano = 'Para crear un autor necesito su email (es obligatorio). ¿Podrías facilitármelo?';
+                        res.nextQuestions = ['¿Cuál es el email del autor?'];
+                    } else {
+                        const existing = autores.find(a => a.email === emailMatch[0]);
+                        if (existing) {
+                            res.intent = 'update';
+                            res.humano = `He encontrado un autor con ese email (${existing.nombreCompleto}). ¿Quieres que actualice sus datos?`;
+                        } else {
+                            res.intent = 'create';
+                            const nombre = nombreMatch ? nombreMatch[1].trim() : 'Nuevo Autor';
+                            res.actions.push({
+                                type: 'createRecord',
+                                payload: { entityType: 'authors', data: { nombreCompleto: nombre, email: emailMatch[0], estado: 'activo' } }
+                            });
+                            res.humano = `¡Perfecto! He preparado la creación del autor **${nombre}**.`;
+                        }
+                    }
+                } else if (msg.includes('vincula') || msg.includes('asigna')) {
+                    // Lógica simplificada de vinculación
+                    res.humano = 'He entendido que quieres vincular entidades. Analizaré los códigos de proyecto y nombres mencionados.';
+                    res.status = 'PENDIENTE';
+                } else if (msg.includes('encargo') || msg.includes('0c') || msg.includes('oficial')) {
+                    return {
+                        intent: 'create_encargo',
+                        status: 'VALIDATION',
+                        humano: 'Preparando el **Encargo Oficial (0C)**. Necesito completar el alcance académico y calibrar el calendario de hitos (A a O). ¿Cuál es el objetivo principal del manual?',
+                        actions: []
+                    };
+                }
+                else {
+                    res.humano = 'Soy tu CRM Copilot. Puedo ayudarte a gestionar Autores, DTs y Proyectos. ¿Qué necesitas hacer hoy?';
+                }
+
+                return res;
+            };
+
+            return (
+                <div className="min-h-screen">
+                    {/* HEADER */}
+                    <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+                        <div className="max-w-7xl mx-auto px-6 py-4">
+                            <div className="flex items-center justify-between gap-8">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-orange-400 text-white p-2 rounded-xl shadow-lg ring-4 ring-orange-50">
+                                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                        </svg>
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <h1 className="text-xl font-black text-gray-700 tracking-tight">MINDSMITH <span className="text-orange-400 font-normal">CRM</span></h1>
+                                        <div className="flex items-center gap-2">
+                                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                                <span>Procedimiento PR00-1</span>
+                                                <span className="text-gray-300">|</span>
+                                                <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-0.5 rounded-full border border-gray-100">
+                                                    <div className={`w-1.5 h-1.5 rounded-full ${['connected', 'connected_direct'].includes(syncStatus) ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : syncStatus === 'error' ? 'bg-red-500' : 'bg-gray-300'}`}></div>
+                                                    <span className="text-[8px] font-black uppercase text-gray-400 tracking-wider">
+                                                        Excel Sync: {syncStatus === 'connected' ? 'Servidor Activo' : syncStatus === 'connected_direct' ? 'Carpeta Conectada' : syncStatus === 'checking' ? 'Buscando...' : 'Desconectado'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            {syncStatus === 'disconnected' && (
+                                                <button
+                                                    onClick={conectarCarpetaLocal}
+                                                    className="text-[9px] bg-orange-400 hover:bg-orange-600 text-white font-black px-2 py-0.5 rounded-full transition-all shadow-sm flex items-center gap-1"
+                                                >
+                                                    📂 CONECTAR CARPETA SINO NODE
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* BUSCADOR GLOBAL */}
+                                <div className="flex-1 max-w-md relative no-print">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                        🔍
+                                    </div>
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar proyectos, códigos, autores o DT..."
+                                        value={busqueda}
+                                        onChange={(e) => setBusqueda(e.target.value)}
+                                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:bg-white focus:border-white sm:text-sm transition-all"
+                                    />
+                                </div>
+
+                                <div className="hidden md:flex items-center gap-6">
+                                    <div className="flex items-center gap-2 bg-orange-50 px-4 py-2 rounded-lg">
+                                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                        <span className="text-sm font-semibold text-orange-600">SAE</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* NAVIGATION */}
+                    <nav className="bg-white border-b border-gray-200 no-print">
+                        <div className="max-w-7xl mx-auto px-6">
+                            <div className="flex gap-1">
+                                {[
+                                    { id: 'inicio', label: '🏠 Inicio', icon: '🏠' },
+                                    { id: 'database', label: '🗄️ Base de Datos', icon: '🗄️' },
+                                    { id: 'gantt', label: '📊 Timeline Proyectos', icon: '📊' },
+                                    { id: 'plantillas', label: '📄 Plantillas', icon: '📄' }
+                                ].map(item => (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => setVistaActual(item.id)}
+                                        className={`px-6 py-4 font-semibold transition-all ${vistaActual === item.id
+                                            ? 'text-orange-400 border-b-2 border-orange-400 bg-orange-50'
+                                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                                            }`}
+                                    >
+                                        {item.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </nav>
+
+                    {/* CONTENIDO */}
+                    <main className="max-w-7xl mx-auto px-6 py-8">
+                        {vistaActual === 'inicio' && (
+                            <VistaInicio
+                                proyectos={proyectosFiltrados}
+                                autores={autores}
+                                dts={dts}
+                                getAutores={getAutoresProyecto}
+                                getDTs={getDTsProyecto}
+                                tareas={tareas}
+                                toggleTarea={toggleTarea}
+                                setVistaActual={setVistaActual}
+                                setProyectoSeleccionado={setProyectoSeleccionado}
+                            />
+                        )}
+                        {vistaActual === 'database' && (
+                            <VistaBaseDatos
+                                autores={autores}
+                                dts={dts}
+                                proyectos={proyectos}
+                                projectAuthors={projectAuthors}
+                                projectDTs={projectDTs}
+                                vistaTab={vistaDbTab}
+                                setVistaTab={setVistaDbTab}
+                                onAddAutor={agregarAutor}
+                                onAddDT={agregarDT}
+                                onAddProyecto={agregarProyecto}
+                                onSelectProyecto={setProyectoSeleccionado}
+                                onAccederProyecto={(p) => { setProyectoSeleccionado(p); setVistaActual('plantillas'); }}
+                                setVistaActual={setVistaActual}
+                            />
+                        )}
+                        {vistaActual === 'ficha_asignatura' && (
+                            <VistaFichaAsignatura
+                                proyecto={proyectoSeleccionado}
+                                autores={autores}
+                                dts={dts}
+                                getAutores={getAutoresProyecto}
+                                getDTs={getDTsProyecto}
+                                setVistaActual={setVistaActual}
+                            />
+                        )}
+                        {vistaActual === 'gantt' && (
+                            <VistaGantt
+                                proyectos={proyectosFiltrados}
+                                getAutores={getAutoresProyecto}
+                                getDTs={getDTsProyecto}
+                                toggleHito={toggleHito}
+                                setVistaActual={setVistaActual}
+                                setPlantillaActiva={setPlantillaActiva}
+                                plantillaActiva={plantillaActiva}
+                                setSeccionActiva={setSeccionActiva}
+                            />
+                        )}
+                        {vistaActual === 'plantillas' && (
+                            <VistaPlantillas
+                                proyectos={proyectosFiltrados}
+                                autores={autores}
+                                dts={dts}
+                                projectAuthors={projectAuthors}
+                                projectDTs={projectDTs}
+                                getAutores={getAutoresProyecto}
+                                getDTs={getDTsProyecto}
+                                proyectoSeleccionado={proyectoSeleccionado}
+                                setProyectoSeleccionado={setProyectoSeleccionado}
+                                plantillaActiva={plantillaActiva}
+                                setPlantillaActiva={setPlantillaActiva}
+                                seccionActiva={seccionActiva}
+                                setSeccionActiva={setSeccionActiva}
+                                onUpdateProyecto={updateProyecto}
+                                onToggleHito={toggleHito}
+                            />
+                        )}
+                    </main>
+                </div>
+            );
+        }
+
+        function VistaInicio({ proyectos, autores, dts, getAutores, getDTs, tareas, toggleTarea, setVistaActual, setProyectoSeleccionado }) {
+            return (
+                <div className="space-y-8">
+                    <div className="bg-gradient-to-r from-orange-400 to-purple-500 rounded-2xl p-8 text-white">
+                        <h2 className="text-3xl font-bold mb-2">Bienvenido al CRM de Mindsmith</h2>
+                        <p className="text-orange-100 text-lg">Sistema de gestión de manuales docentes según procedimiento PR00-1</p>
+                    </div>
+
+                    <div className="grid md:grid-cols-3 gap-6">
+                        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                            <div className="text-4xl mb-4">✍️</div>
+                            <h3 className="text-xl font-bold text-gray-700 mb-2">Autores</h3>
+                            <p className="text-3xl font-bold text-orange-400 mb-2">{Object.keys(autores).length}</p>
+                            <p className="text-sm text-gray-500">En la base de datos</p>
+                        </div>
+                        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                            <div className="text-4xl mb-4">🎓</div>
+                            <h3 className="text-xl font-bold text-gray-700 mb-2">Directores (DT)</h3>
+                            <p className="text-3xl font-bold text-green-500 mb-2">{Object.keys(dts).length}</p>
+                            <p className="text-sm text-gray-500">Responsables académicos</p>
+                        </div>
+                        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                            <div className="text-4xl mb-4">📄</div>
+                            <h3 className="text-xl font-bold text-gray-700 mb-2">Proyectos</h3>
+                            <p className="text-3xl font-bold text-purple-500 mb-2">{proyectos.length}</p>
+                            <p className="text-sm text-gray-500">Manuales docentes</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 className="text-2xl font-bold text-gray-700 mb-4">Proyectos Recientes</h3>
+                        <div className="grid gap-4">
+                            {proyectos.map(proyecto => (
+                                <div
+                                    key={proyecto.id}
+                                    className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-all cursor-pointer"
+                                    onClick={() => {
+                                        setProyectoSeleccionado(proyecto);
+                                        setVistaActual('gantt');
+                                    }}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <h4 className="text-xl font-bold text-gray-700">{proyecto.nombre}</h4>
+                                                <span className="bg-orange-100 text-orange-600 px-3 py-1 rounded-full text-sm font-bold">
+                                                    {proyecto.codigo}
+                                                </span>
+                                            </div>
+                                            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-500">
+                                                <span>👤 DT: {getDTs(proyecto.id) || proyecto.dt}</span>
+                                                <span>✍️ Autores: {getAutores(proyecto.id) || proyecto.autor}</span>
+                                                <span>📅 Inicio: {proyecto.inicio}</span>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-sm text-gray-500 mb-1">Progreso</div>
+                                            <div className="text-2xl font-bold text-orange-400">
+                                                {proyecto.hitosCompletados.length}/{HITOS_DEFINICION.length}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function VistaGantt({ proyectos, getAutores, getDTs, toggleHito, setVistaActual, setPlantillaActiva, plantillaActiva, setSeccionActiva }) {
+            const [seleccion, setSeleccion] = useState({ hito: null, proyecto: null });
+            const [filtroProyecto, setFiltroProyecto] = useState('');
+
+            const handleHitoClick = (hito, proyecto = null) => {
+                setSeleccion({ hito, proyecto });
+            };
+
+            const proyectosFiltradosGantt = proyectos.filter(p =>
+                p.nombre.toLowerCase().includes(filtroProyecto.toLowerCase()) ||
+                p.codigo.toLowerCase().includes(filtroProyecto.toLowerCase())
+            );
+
+            return (
+                <div className="space-y-6">
+                    <div>
+                        <h2 className="text-3xl font-bold text-gray-700 mb-2">Timeline Proyectos</h2>
+                        <p className="text-gray-500">Timeline de hitos por proyecto (6 meses)</p>
+                    </div>
+
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        {/* HEADER DEL GANTT */}
+                        <div className="grid grid-cols-12 border-b border-gray-200 bg-gray-50">
+                            <div className="col-span-3 p-4 font-bold text-gray-700 border-r border-gray-200">
+                                <div className="flex flex-col gap-2">
+                                    <span>Proyecto</span>
+                                    <div className="relative">
+                                        <span className="absolute inset-y-0 left-0 pl-2 flex items-center text-gray-400 text-xs">🔍</span>
+                                        <input
+                                            type="text"
+                                            placeholder="Filtrar proyecto..."
+                                            value={filtroProyecto}
+                                            onChange={(e) => setFiltroProyecto(e.target.value)}
+                                            className="w-full pl-7 pr-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-orange-400 outline-none font-normal"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="col-span-9 grid grid-cols-6 text-center text-sm font-semibold text-gray-500">
+                                {['Mes 1', 'Mes 2', 'Mes 3', 'Mes 4', 'Mes 5', 'Mes 6'].map((mes, i) => (
+                                    <div key={i} className="p-4 border-r border-gray-200 last:border-0 bg-gray-50">
+                                        {mes}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* FILAS DE PROYECTOS */}
+                        {proyectosFiltradosGantt.length === 0 ? (
+                            <div className="p-12 text-center text-gray-400 italic">No se encontraron proyectos con ese filtro.</div>
+                        ) : proyectosFiltradosGantt.map(proyecto => (
+                            <div key={proyecto.id} className="grid grid-cols-12 border-b border-gray-200 last:border-0 hover:bg-slate-50 transition duration-150">
+                                <div className="col-span-3 p-4 border-r border-gray-200">
+                                    <div className="font-bold text-gray-700">{proyecto.nombre}</div>
+                                    <div className="text-sm text-gray-500">{proyecto.codigo}</div>
+                                    <div className="mt-2 text-xs text-gray-500 font-medium">
+                                        {proyecto.hitosCompletados.length}/{HITOS_DEFINICION.length} hitos
+                                    </div>
+                                </div>
+                                <div className="col-span-9 p-4 relative h-24 overflow-hidden rounded-r-xl">
+                                    {/* REGIONES DE FASE (BACKGROUND) */}
+                                    {FASES_GANTT.map(fase => (
+                                        <div
+                                            key={fase.id}
+                                            className={`absolute h-full ${fase.color} border-l ${fase.border} flex flex-col items-center justify-end pb-1 opacity-40`}
+                                            style={{
+                                                left: `${((fase.mesInicio) / 6) * 100}%`,
+                                                width: `${((fase.mesFin - fase.mesInicio) / 6) * 100}%`,
+                                                top: 0
+                                            }}
+                                        >
+                                            <span className={`text-[8px] font-black uppercase tracking-tighter ${fase.text}`}>{fase.nombre}</span>
+                                        </div>
+                                    ))}
+
+                                    {/* CONTENEDOR DE BARRAS */}
+                                    <div className="absolute inset-x-4 inset-y-8 bg-gray-200/50 rounded-full h-1.5 top-11 z-0"></div>
+
+                                    {/* HITOS */}
+                                    {HITOS_DEFINICION.map(hito => {
+                                        const completado = proyecto.hitosCompletados.includes(hito.id);
+                                        const posicion = (hito.mes / 6) * 100;
+                                        return (
+                                            <div
+                                                key={hito.id}
+                                                className={`absolute w-8 h-8 rounded-full border-2 border-white shadow-md cursor-pointer transition-all duration-300 hover:scale-125 hover:z-20 flex items-center justify-center text-sm ${completado ? hito.color : 'bg-gray-200 grayscale opacity-70'}`}
+                                                style={{ left: `calc(${posicion}% - 16px)`, top: '28px' }}
+                                                onClick={() => handleHitoClick(hito, proyecto)}
+                                                title={`${hito.id}: ${hito.nombre} (Click para ver detalles)`}
+                                            >
+                                                <span>{hito.icono}</span>
+                                                {/* ETIQUETA FLOTANTE PEQUEÑA */}
+                                                <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] font-bold text-gray-500 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    {hito.id}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* LEYENDA INTERACTIVA */}
+                    <div className="grid grid-cols-12 gap-6">
+                        <div className="col-span-8 bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                            <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                                <span>📍 Leyenda de Hitos</span>
+                                <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded-full">Haz clic para ver detalles</span>
+                            </h3>
+                            <div className="space-y-6">
+                                {FASES_GANTT.map(fase => (
+                                    <div key={fase.id} className="space-y-2">
+                                        <div className={`text-[10px] font-black uppercase tracking-[0.2em] ${fase.text} mb-2 flex items-center justify-between`}>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`w-2 h-2 rounded-full ${fase.id === 'D1' ? 'bg-slate-400' : (fase.id === 'D2' ? 'bg-orange-400' : (fase.id === 'D3' ? 'bg-fuchsia-500' : 'bg-orange-400'))}`}></span>
+                                                {fase.nombre}
+                                            </div>
+                                            <button
+                                                onClick={() => { setPlantillaActiva(fase.id); setVistaActual('plantillas'); }}
+                                                className="text-[10px] text-orange-400 hover:text-orange-600 uppercase tracking-widest font-black transition-colors"
+                                            >
+                                                Ir a Dossier →
+                                            </button>
+                                        </div>
+                                        {/* Hitos simplificados: se gestionan desde el gráfico */}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* PANEL DE DETALLE */}
+                        <div className="col-span-4">
+                            <div className={`h-full bg-white rounded-xl p-6 shadow-sm border border-gray-200 transition-all duration-300 ${seleccion.hito ? 'opacity-100 translate-x-0' : 'opacity-50 grayscale'}`}>
+                                {seleccion.hito ? (
+                                    <>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className={`text-xs font-bold text-white px-2 py-1 rounded flex items-center gap-1 ${seleccion.hito.color}`}>
+                                                {seleccion.hito.icono} HITO {seleccion.hito.id}
+                                            </span>
+                                            <span className="text-xs text-gray-400">Mes {seleccion.hito.mes}</span>
+                                        </div>
+                                        <h4 className="text-xl font-bold text-gray-700 mb-2">{seleccion.hito.nombre}</h4>
+                                        <p className="text-sm text-gray-500 leading-relaxed mb-4">
+                                            {seleccion.hito.desc}
+                                        </p>
+
+                                        {/* ACCESOS DIRECTOS A PLANTILLAS */}
+                                        <div className="mt-4 pt-4 border-t border-gray-100">
+                                            <div className="text-xs font-bold text-gray-400 uppercase mb-2">Documentos Asociados:</div>
+                                            <div className="flex flex-col gap-2">
+                                                {Object.values(PLANTILLAS).map(d => (
+                                                    d.secciones.filter(sec => {
+                                                        // MEJORA: Lógica de coincidencia más flexible y robusta
+                                                        const hitoDoc = sec.hitoId; // El ID del hito definido en la sección (ej: 'PRE', 'E', '0A')
+                                                        const hitoSeleccionado = seleccion.hito.id; // El ID del hito clicado en el Gantt (ej: 'PRE', '0A')
+
+                                                        // 1. Coincidencia Exacta
+                                                        let match = hitoDoc === hitoSeleccionado;
+
+                                                        // 2. Coincidencia por "Familia" (para hitos agrupados)
+                                                        if (!match) {
+                                                            // Si es un hito de tipo letra (ej: 'A', 'B'), permitir coincidencias numéricas asociadas si se definen
+                                                            // En este caso, simplificamos: Si el hitoDoc empieza por la misma letra/código
+                                                            if (hitoDoc === 'PRE' && hitoSeleccionado === '0A') match = true; // El PRE cubre 0A
+                                                            if (hitoDoc === 'PRE' && hitoSeleccionado === 'PRE') match = true;
+                                                        }
+
+                                                        return match && sec.esPrincipal;
+                                                    })
+                                                        .map(sec => (
+                                                            <button
+                                                                key={sec.id}
+                                                                onClick={() => {
+                                                                    setPlantillaActiva(d.id);
+                                                                    setSeccionActiva(sec.id);
+                                                                    setVistaActual('plantillas');
+                                                                }}
+                                                                className="text-left w-full py-3 px-4 bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-lg text-xs font-bold flex items-center justify-between transition-colors mb-2"
+                                                            >
+                                                                <div className="flex items-center gap-2">
+                                                                    <span>📄 {sec.id}: {sec.titulo}</span>
+                                                                    {seleccion.proyecto?.hitosCompletados.includes(sec.hitoId) && <span className="text-[10px] bg-green-500 text-white px-1.5 py-0.5 rounded">✓</span>}
+                                                                </div>
+                                                                <span>➔</span>
+                                                            </button>
+                                                        ))
+                                                ))}
+                                                {/* FALLBACK: Si no hay documentos específicos, mostrar enlace al Dossier de la fase */}
+                                                {Object.values(PLANTILLAS).every(d => !d.secciones.some(sec => sec.hitoId === seleccion.hito.id || (sec.hitoId === 'PRE' && seleccion.hito.id === 'PRE'))) && (
+                                                    <div className="text-center p-4">
+                                                        <p className="text-[10px] text-gray-400 italic mb-2">No hay un documento único asociado a este hito.</p>
+                                                        <button
+                                                            onClick={() => {
+                                                                setPlantillaActiva(seleccion.hito.faseId);
+                                                                setVistaActual('plantillas');
+                                                            }}
+                                                            className="text-xs text-orange-400 font-bold underline"
+                                                        >
+                                                            Ir al Dossier {seleccion.hito.faseId}
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* ACCIONES DE CONTEXTO */}
+                                        {seleccion.proyecto ? (
+                                            <div className="mt-4 pt-4 border-t border-gray-100">
+                                                <div className="text-xs font-bold text-gray-400 uppercase mb-2">Proyecto Seleccionado</div>
+                                                <div className="font-bold text-gray-700 mb-3">{seleccion.proyecto.nombre}</div>
+
+                                                <button
+                                                    onClick={() => toggleHito(seleccion.proyecto.id, seleccion.hito.id)}
+                                                    className={`w-full py-2 px-4 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2 ${seleccion.proyecto.hitosCompletados.includes(seleccion.hito.id)
+                                                        ? 'bg-red-50 text-red-500 hover:bg-red-100'
+                                                        : 'bg-green-50 text-green-500 hover:bg-green-100'
+                                                        }`}
+                                                >
+                                                    {seleccion.proyecto.hitosCompletados.includes(seleccion.hito.id)
+                                                        ? '↩️ Marcar como Pendiente'
+                                                        : '✅ Marcar como Completado'}
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-400 italic">
+                                                Selecciona un punto en el gráfico para gestionar su estado.
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="h-full flex flex-col items-center justify-center text-center text-gray-400">
+                                        <div className="text-3xl mb-2">👆</div>
+                                        <p className="text-sm font-medium">Selecciona un hito para ver detalles y gestionar su estado</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function VistaPlantillas({ proyectos, autores, dts, projectAuthors, projectDTs, proyectoSeleccionado, setProyectoSeleccionado, getAutores, getDTs, plantillaActiva, setPlantillaActiva, seccionActiva, setSeccionActiva, onUpdateProyecto, onToggleHito }) {
+            if (!proyectoSeleccionado) return null;
+
+            const handleScrollToSeccion = (id) => {
+                setSeccionActiva(id);
+                const el = document.getElementById(id);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    el.classList.add('ring-4', 'ring-orange-400', 'ring-opacity-50', 'bg-orange-50/30');
+                    setTimeout(() => {
+                        el.classList.remove('ring-4', 'ring-orange-400', 'ring-opacity-50', 'bg-orange-50/30');
+                    }, 2000);
+                }
+            };
+
+            const handleSendToOutlook = () => {
+                const template = PLANTILLAS[plantillaActiva];
+                const templateContent = template.contenido(proyectoSeleccionado);
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = templateContent;
+
+                // Enviamos el expediente completo (Dossier)
+                let finalHtml = tempDiv.innerHTML;
+
+                const cleanerDiv = document.createElement('div');
+                cleanerDiv.innerHTML = finalHtml;
+
+                // Limpieza de UI y elementos no deseados para el correo
+                cleanerDiv.querySelectorAll('.status-indicator, .toggle-hito-btn, .no-print, button, form, hr').forEach(el => el.remove());
+
+                // Formateo avanzado de texto (convertir etiquetas HTML a estructura de texto plano profesional)
+                let emailBody = "";
+
+                // 1. Cabecera Corporativa
+                emailBody += "MINDSMITH CRM - REPORTE DE DOCUMENTACIÓN\n";
+                emailBody += "========================================\n";
+                emailBody += `PROYECTO: ${proyectoSeleccionado.codigo} - ${proyectoSeleccionado.nombre}\n`;
+                emailBody += `DOCUMENTO: ${template.nombre} (COMPLETO)\n`;
+                emailBody += `FECHA: ${new Date().toLocaleDateString('es-ES')}\n`;
+                emailBody += "========================================\n\n";
+
+                // 2. Saludo
+                emailBody += "Estimado/a colaborador/a,\n\n";
+                emailBody += `Le envío el expediente completo correspondiente a "${template.nombre}" procesado a través del CRM Mindsmith:\n\n`;
+
+                // 3. Procesamiento de contenido MEJORADO para HTML con Estilos en Línea (Rich Text)
+                const applyInlineStyles = (element) => {
+                    // Mapa EXTENDIDO de clases Tailwind a CSS estándar para correos
+                    const styleMap = {
+                        'text-orange-600': 'color: #c2410c; font-weight: 900;',
+                        'text-orange-800': 'color: #ea580c; font-weight: 800;',
+                        'text-orange-600': 'color: #c2410c; font-weight: 700;',
+                        'text-orange-400': 'color: #ea580c; font-weight: 600;',
+                        'text-orange-400': 'color: #fb923c; font-weight: 400;',
+                        'bg-orange-600': 'background-color: #c2410c; color: white;',
+                        'bg-orange-400': 'background-color: #ea580c; color: white;',
+                        'bg-orange-50': 'background-color: #fff7ed;',
+                        'border-orange-100': 'border: 1px solid #ffedd5;',
+                        'border-orange-50': 'border: 1px solid #fff7ed;',
+                        'prose-orange': 'color: #431407;',
+                        'font-black': 'font-weight: 900;',
+                        'font-bold': 'font-weight: 700;',
+                        // Typography
+                        'text-3xl': 'font-size: 24px; line-height: 32px;',
+                        'text-2xl': 'font-size: 20px; line-height: 28px;',
+                        'text-xl': 'font-size: 18px; line-height: 26px;',
+                        'text-lg': 'font-size: 16px; line-height: 24px;',
+                        'text-sm': 'font-size: 12px;',
+                        'text-xs': 'font-size: 10px;',
+                        'italic': 'font-style: italic;',
+                        'uppercase': 'text-transform: uppercase;',
+                        'tracking-widest': 'letter-spacing: 0.1em;',
+                        'tracking-tighter': 'letter-spacing: -0.05em;',
+                        'tracking-tight': 'letter-spacing: -0.025em;',
+                        'leading-none': 'line-height: 1;',
+                        'leading-tight': 'line-height: 1.25;',
+                        'leading-snug': 'line-height: 1.375;',
+                        'leading-normal': 'line-height: 1.5;',
+                        'leading-relaxed': 'line-height: 1.625;',
+                        'leading-loose': 'line-height: 2;',
+
+                        // Spacing (Padding)
+                        'p-0': 'padding: 0px;',
+                        'p-1': 'padding: 4px;', 'p-2': 'padding: 8px;', 'p-3': 'padding: 12px;', 'p-4': 'padding: 16px;',
+                        'p-5': 'padding: 20px;', 'p-6': 'padding: 24px;', 'p-8': 'padding: 32px;', 'p-10': 'padding: 40px;',
+                        'p-12': 'padding: 48px;', 'p-16': 'padding: 64px;',
+                        'px-2': 'padding-left: 8px; padding-right: 8px;',
+                        'px-3': 'padding-left: 12px; padding-right: 12px;',
+                        'px-4': 'padding-left: 16px; padding-right: 16px;',
+                        'px-6': 'padding-left: 24px; padding-right: 24px;',
+                        'py-1': 'padding-top: 4px; padding-bottom: 4px;',
+                        'py-2': 'padding-top: 8px; padding-bottom: 8px;',
+                        'py-3': 'padding-top: 12px; padding-bottom: 12px;',
+                        'py-4': 'padding-top: 16px; padding-bottom: 16px;',
+
+                        // Spacing (Margin)
+                        'm-0': 'margin: 0px;',
+                        'mb-1': 'margin-bottom: 4px;', 'mb-2': 'margin-bottom: 8px;', 'mb-3': 'margin-bottom: 12px;',
+                        'mb-4': 'margin-bottom: 16px;', 'mb-6': 'margin-bottom: 24px;', 'mb-8': 'margin-bottom: 32px;',
+                        'mb-10': 'margin-bottom: 40px;', 'mb-12': 'margin-bottom: 48px;',
+                        'mt-2': 'margin-top: 8px;', 'mt-4': 'margin-top: 16px;', 'mt-6': 'margin-top: 24px;', 'mt-8': 'margin-top: 32px;',
+                        'mr-2': 'margin-right: 8px;',
+
+                        // Layout & Sizing
+                        'w-full': 'width: 100%;',
+                        'h-full': 'height: 100%;',
+                        'block': 'display: block;',
+                        'inline-block': 'display: inline-block;',
+                        'flex': 'display: flex;',
+                        'justify-between': 'justify-content: space-between;',
+                        'justify-center': 'justify-content: center;',
+                        'items-center': 'align-items: center;',
+                        'items-start': 'align-items: flex-start;',
+                        'gap-2': 'gap: 8px;', 'gap-3': 'gap: 12px;', 'gap-4': 'gap: 16px;', 'gap-6': 'gap: 24px;', 'gap-8': 'gap: 32px;',
+                        'grid': 'display: grid;',
+                        'grid-cols-1': 'grid-template-columns: repeat(1, minmax(0, 1fr));',
+                        'grid-cols-2': 'grid-template-columns: repeat(2, minmax(0, 1fr));',
+                        'grid-cols-12': 'grid-template-columns: repeat(12, minmax(0, 1fr));',
+                        'max-w-none': 'max-width: none;',
+                        'max-w-lg': 'max-width: 32rem;',
+                        'max-w-xl': 'max-width: 36rem;',
+
+                        // Borders & Radius
+                        'border': 'border: 1px solid #e2e8f0;',
+                        'border-2': 'border-width: 2px; border-style: solid;',
+                        'border-t': 'border-top-width: 1px; border-top-style: solid;',
+                        'border-b': 'border-bottom-width: 1px; border-bottom-style: solid;',
+                        'rounded': 'border-radius: 4px;',
+                        'rounded-lg': 'border-radius: 8px;',
+                        'rounded-xl': 'border-radius: 12px;',
+                        'rounded-2xl': 'border-radius: 16px;',
+                        'rounded-3xl': 'border-radius: 24px;',
+                        'rounded-full': 'border-radius: 9999px;',
+
+                        // Effects
+                        'shadow-sm': 'box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);',
+                        'shadow': 'box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);',
+                        'shadow-md': 'box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);',
+                        'shadow-lg': 'box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);',
+                        'opacity-50': 'opacity: 0.5;', 'opacity-70': 'opacity: 0.7;', 'opacity-80': 'opacity: 0.8;'
+                    };
+
+                    // Mapa de Colores Simplificado para Email
+                    const colors = {
+                        slate: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a' },
+                        gray: { 50: '#f9fafb', 100: '#f3f4f6', 200: '#e5e7eb', 300: '#d1d5db', 400: '#9ca3af', 500: '#6b7280', 600: '#4b5563', 700: '#374151', 800: '#1f2937', 900: '#111827' },
+                        indigo: { 50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc', 400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 800: '#3730a3', 900: '#312e81' },
+                        blue: { 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a' },
+                        emerald: { 50: '#ecfdf5', 100: '#d1fae5', 200: '#a7f3d0', 300: '#6ee7b7', 400: '#34d399', 500: '#10b981', 600: '#059669', 700: '#047857', 800: '#065f46', 900: '#064e3b' },
+                        green: { 50: '#f0fdf4', 100: '#dcfce7', 200: '#bbf7d0', 300: '#86efac', 400: '#4ade80', 500: '#22c55e', 600: '#16a34a', 700: '#15803d', 800: '#166534', 900: '#14532d' },
+                        amber: { 50: '#fffbeb', 100: '#fef3c7', 200: '#fde68a', 300: '#fcd34d', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309', 800: '#92400e', 900: '#78350f' },
+                        orange: { 50: '#fff7ed', 100: '#ffedd5', 200: '#fed7aa', 300: '#fdba74', 400: '#fb923c', 500: '#f97316', 600: '#ea580c', 700: '#c2410c', 800: '#ea580c', 900: '#f97316' },
+                        red: { 50: '#fef2f2', 100: '#fee2e2', 200: '#fecaca', 300: '#fca5a5', 400: '#f87171', 500: '#ef4444', 600: '#dc2626', 700: '#b91c1c', 800: '#991b1b', 900: '#7f1d1d' },
+                        rose: { 50: '#fff1f2', 100: '#ffe4e6', 200: '#fecdd3', 300: '#fda4af', 400: '#fb7185', 500: '#f43f5e', 600: '#e11d48', 700: '#be123c', 800: '#9f1239', 900: '#881337' },
+                        fuchsia: { 50: '#fdf4ff', 100: '#fae8ff', 200: '#f5d0fe', 300: '#f0abfc', 400: '#e879f9', 500: '#d946ef', 600: '#c026d3', 700: '#a21caf', 800: '#86198f', 900: '#701a75' },
+                        purple: { 50: '#faf5ff', 100: '#f3e8ff', 200: '#e9d5ff', 300: '#d8b4fe', 400: '#c084fc', 500: '#a855f7', 600: '#9333ea', 700: '#7e22ce', 800: '#6b21a8', 900: '#581c87' },
+                        sky: { 50: '#f0f9ff', 100: '#e0f2fe', 200: '#bae6fd', 300: '#7dd3fc', 400: '#38bdf8', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1', 800: '#075985', 900: '#0c4a6e' }
+                    }
+
+                    // Función auxiliar para parsear clases de color
+                    const getColorStyle = (cls) => {
+                        const parts = cls.split('-');
+                        // Estructura: prefix-color-degree (text-orange-400) o prefix-color-degree/opacity
+                        if (parts.length >= 3) {
+                            let type = parts[0]; // text, bg, border
+                            let colorName = parts[1];
+                            let degreeStr = parts[2].split('/')[0]; // Ignorar opacidad por ahora
+                            let degree = parseInt(degreeStr);
+
+                            if (colors[colorName] && colors[colorName][degree]) {
+                                const hex = colors[colorName][degree];
+                                if (type === 'text') return `color: ${hex};`;
+                                if (type === 'bg') return `background-color: ${hex};`;
+                                if (type === 'border') return `border-color: ${hex};`;
+                            }
+                        }
+                        return '';
+                    };
+
+                    // Aplicar estilos recursivamente
+                    const apply = (node) => {
+                        if (node.nodeType === 1) { // Elemento
+                            let inlineStyle = '';
+                            if (node.classList && node.classList.length > 0) {
+                                node.classList.forEach(cls => {
+                                    // 1. Mapeo Directo
+                                    if (styleMap[cls]) {
+                                        inlineStyle += styleMap[cls] + ' ';
+                                    }
+                                    // 2. Mapeo Dinámico de Colores
+                                    else if (cls.startsWith('text-') || cls.startsWith('bg-') || cls.startsWith('border-')) {
+                                        inlineStyle += getColorStyle(cls) + ' ';
+                                        // Casos especiales (fallback para texto white)
+                                        if (cls === 'text-white') inlineStyle += 'color: #ffffff; ';
+                                        if (cls === 'bg-white') inlineStyle += 'background-color: #ffffff; ';
+                                        if (cls === 'bg-black') inlineStyle += 'background-color: #000000; ';
+                                    }
+                                });
+                            }
+
+                            // 3. Manejo especial de Layout (flex/grid compatibility fallbacks)
+                            // Si es flex o grid, forzamos algunos estilos para mejorar comportamiento en tablas simples simuladas
+                            const display = node.style.display;
+
+                            // Preservar estilos existentes si los hay
+                            const existing = node.getAttribute('style') || '';
+                            node.setAttribute('style', existing + inlineStyle);
+
+                            // Estilos por defecto para etiquetas comunes para asegurar consistencia
+                            const tag = node.tagName.toLowerCase();
+                            if (tag === 'p') node.style.marginBottom = '1em';
+                            if (tag === 'h4') { node.style.marginTop = '1.5em'; node.style.marginBottom = '0.5em'; node.style.lineHeight = '1.2'; }
+                            if (tag === 'h3') { node.style.marginTop = '1.5em'; node.style.marginBottom = '0.5em'; node.style.lineHeight = '1.2'; }
+                            if (tag === 'ul') { node.style.paddingLeft = '20px'; node.style.listStyleType = 'disc'; node.style.marginBottom = '1em'; }
+                            if (tag === 'li') node.style.marginBottom = '0.5em';
+                        }
+                        node.childNodes.forEach(child => apply(child));
+                    };
+                    apply(element);
+                    return element.innerHTML;
+                };
+
+                // Preparar HTML enriquecido
+                const richHtmlContent = `
+                    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #431407; line-height: 1.6;">
+                        <div style="background-color: #fff7ed; padding: 20px; border-bottom: 2px solid #fb923c; margin-bottom: 20px;">
+                            <h2 style="color: #ea580c; margin: 0; font-size: 24px;">MINDSMITH CRM - REPORTE</h2>
+                            <p style="color: #f97316; margin: 5px 0 0 0; font-size: 14px;">PROYECTO: <strong>${proyectoSeleccionado.codigo}</strong> • DOCUMENTO: <strong>${template.nombre}</strong></p>
+                        </div>
+                        <div style="padding: 20px;">
+                            <p>Estimado/a colaborador/a,</p>
+                            <p>Adjunto encontrará el expediente completo de <strong>"${template.nombre}"</strong>:</p>
+                            <br>
+                            ${applyInlineStyles(cleanerDiv)}
+                            <br>
+                            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0;">
+                            <p style="font-size: 12px; color: #94a3b8; text-align: center;">Mindsmith CRM 2026 • Procedimiento PR00-1</p>
+                        </div>
+                    </div>
+                `;
+
+                const plainTextContent = emailBody; // Mantenemos el texto plano generado anteriormente como fallback
+
+                // Destinatarios
+                const linkAutor = projectAuthors.find(l => l.projectId === proyectoSeleccionado.id && (l.rolEnProyecto === 'autor_principal' || l.rolEnProyecto === 'Responsable'));
+                const autorObj = linkAutor ? autores.find(a => a.id === linkAutor.authorId) : null;
+                const emailDestino = autorObj ? autorObj.email : 'gestion.sae@universidad.edu';
+
+                const linkDT = projectDTs.find(l => l.projectId === proyectoSeleccionado.id);
+                const dtObj = linkDT ? dts.find(d => d.id === linkDT.dtId) : null;
+                const emailCC = dtObj ? dtObj.email : '';
+
+                const subject = `[MINDSMITH] ${proyectoSeleccionado.codigo} - ${template.nombre} (Dossier Completo)`;
+
+                // Protección contra longitud excesiva (Límite ~2000 chars para mailto)
+                const mailtoUrlBase = `mailto:${emailDestino}?subject=${encodeURIComponent(subject)}&cc=${encodeURIComponent(emailCC)}&body=`;
+                const maxBodyLength = 1900 - mailtoUrlBase.length;
+
+                // LOGICA MEJORADA DE PORTAPAPELES (Rich Text + Plain Text)
+                if (encodeURIComponent(richHtmlContent).length > maxBodyLength) { // Usamos el HTML enriquecido como referencia de 'muy largo'
+                    const blobHtml = new Blob([richHtmlContent], { type: 'text/html' });
+                    const blobText = new Blob([plainTextContent], { type: 'text/plain' });
+
+                    const data = [new ClipboardItem({
+                        'text/html': blobHtml,
+                        'text/plain': blobText
+                    })];
+
+                    navigator.clipboard.write(data).then(() => {
+                        const shortHtmlBody = "⚠️ <strong>CONTENIDO EXTENSO COPIADO</strong><br><br>El contenido formateado se ha copiado a su portapapeles.<br>Por favor, pegue (Ctrl+V) el contenido aquí.";
+                        // Abrir cliente de correo con mensaje corto
+                        window.location.href = mailtoUrlBase + "EL CONTENIDO SE HA COPIADO AL PORTAPAPELES CON FORMATO. POR FAVOR, PEGUE AQUI (CTRL+V).";
+                        alert('¡CONTENIDO COPIADO CON FORMATO!\n\nEl reporte incluye gráficos y estilos que se han copiado al portapapeles.\n\n1. Se abrirá su correo.\n2. Haga clic en el cuerpo del mensaje.\n3. Presione Ctrl+V para pegar el informe con todo su diseño.');
+                    }).catch(err => {
+                        console.error('Fallo al copiar formato rico, intentando texto plano:', err);
+                        // Fallback a texto plano si falla la API de Clipboard avanzada
+                        navigator.clipboard.writeText(plainTextContent).then(() => {
+                            window.location.href = mailtoUrlBase + "CONTENIDO COPIADO AL PORTAPAPELES (TEXTO PLANO). PEGAR AQUI.";
+                            alert('Se ha copiado el contenido en TEXTO PLANO (el formato enriquecido no fue soportado por su navegador).');
+                        });
+                    });
+                } else {
+                    // Si cabe en un mailto simple, usamos texto plano (mailto no soporta HTML body)
+                    window.location.href = mailtoUrlBase + encodeURIComponent(plainTextContent);
+                }
+            };
+
+
+            return (
+                <div className="space-y-6 animate-fadeIn">
+                    {/* ENCABEZADO Y PROYECTO */}
+                    <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-200">
+                        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div>
+                                <h2 className="text-3xl font-black text-gray-700 tracking-tight">Expedientes PR00-1</h2>
+                                <p className="text-gray-500 font-medium">Gestión documental unificada por fases</p>
+                            </div>
+                            <div className="w-full md:w-96">
+                                <label className="block text-[10px] font-black text-orange-400 mb-1 tracking-widest uppercase">Proyecto Seleccionado:</label>
+                                <select
+                                    value={proyectoSeleccionado.id}
+                                    onChange={(e) => setProyectoSeleccionado(proyectos.find(p => p.id === e.target.value))}
+                                    className="w-full p-3 font-bold border-2 border-orange-100 rounded-xl focus:ring-4 focus:ring-orange-50 focus:border-orange-400 bg-orange-50/30 transition-all cursor-pointer"
+                                >
+                                    {proyectos.map(p => (
+                                        <option key={p.id} value={p.id}>{p.codigo} - {p.nombre}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-12 gap-8 items-start">
+                        {/* PANEL DE NAVEGACIÓN (DOSSIERS + SECCIONES) */}
+                        <div className="col-span-12 lg:col-span-4 space-y-6">
+                            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden ring-1 ring-black/5">
+                                <div className="bg-gray-700 px-6 py-4 flex justify-between items-center">
+                                    <span className="text-white text-[10px] font-black tracking-[0.2em] uppercase">Selección de Dossier</span>
+                                    <span className="bg-white/10 text-white/60 text-[10px] px-2 py-0.5 rounded-full font-bold">4 Fases</span>
+                                </div>
+                                <div className="divide-y divide-gray-100">
+                                    {Object.values(PLANTILLAS).map(d => {
+                                        const hitosDossier = d.secciones.map(s => s.hitoId);
+                                        const completadosDossier = hitosDossier.filter(h => h && proyectoSeleccionado.hitosCompletados.includes(h));
+                                        const progreso = hitosDossier.length > 0 ? (completadosDossier.length / hitosDossier.length) * 100 : 0;
+
+                                        return (
+                                            <button
+                                                key={d.id}
+                                                onClick={() => { setPlantillaActiva(d.id); setSeccionActiva(d.secciones[0].id); }}
+                                                className={`w-full p-5 text-left transition-all relative group ${plantillaActiva === d.id ? 'bg-orange-400 text-white' : 'hover:bg-orange-50 text-gray-500'}`}
+                                            >
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <div className={`text-[10px] font-black uppercase tracking-wider ${plantillaActiva === d.id ? 'text-indigo-200' : 'text-orange-400'}`}>{d.fase}</div>
+                                                    {progreso > 0 && (
+                                                        <div className={`text-[8px] font-black px-1.5 py-0.5 rounded-full ${plantillaActiva === d.id ? 'bg-white/20 text-white' : 'bg-orange-100 text-orange-600'}`}>
+                                                            {Math.round(progreso)}%
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="font-extrabold text-sm leading-tight group-hover:translate-x-1 transition-transform">{d.nombre}</div>
+                                                {plantillaActiva === d.id && (
+                                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-2xl animate-pulse">→</div>
+                                                )}
+                                                {/* BARRA DE PROGRESO DISCRETA */}
+                                                <div className="absolute bottom-0 left-0 h-1 bg-white opacity-20 transition-all" style={{ width: `${progreso}%` }}></div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden ring-1 ring-black/5">
+                                <div className="bg-orange-400 px-6 py-4 flex justify-between items-center">
+                                    <span className="text-white text-[10px] font-black tracking-[0.2em] uppercase">Documentos Internos</span>
+                                    <span className="bg-white/20 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">{PLANTILLAS[plantillaActiva].secciones.length} Docs</span>
+                                </div>
+                                <div className="p-3 space-y-1 max-h-[400px] overflow-y-auto custom-scrollbar">
+                                    {PLANTILLAS[plantillaActiva].secciones.map(sec => {
+                                        const hitoCompletado = sec.hitoId && proyectoSeleccionado.hitosCompletados.includes(sec.hitoId);
+                                        return (
+                                            <button
+                                                key={sec.id}
+                                                onClick={() => handleScrollToSeccion(sec.id)}
+                                                className={`w-full p-4 text-left rounded-2xl transition-all flex items-center gap-4 group ${seccionActiva === sec.id ? 'bg-orange-50 text-orange-600 ring-2 ring-orange-400 shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
+                                            >
+                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs transition-all relative ${seccionActiva === sec.id ? 'bg-orange-400 text-white shadow-lg' : 'bg-gray-100 text-gray-400 group-hover:bg-white group-hover:shadow'}`}>
+                                                    {sec.id}
+                                                    {hitoCompletado && (
+                                                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center text-[8px] text-white">✓</div>
+                                                    )}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="font-bold text-sm truncate uppercase tracking-tight flex items-center gap-2">
+                                                        {sec.titulo}
+                                                        {hitoCompletado && <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">OK</span>}
+                                                    </div>
+                                                    <div className="text-[10px] font-medium opacity-60 truncate">
+                                                        {sec.hitoId ? `Hito: ${sec.hitoId}` : sec.sub}
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* VISTA DEL DOCUMENTO */}
+                        <div className="col-span-12 lg:col-span-8 space-y-6">
+                            {/* MINI-CRONOGRAMA DE FASE */}
+                            <div className="bg-white rounded-3xl p-6 shadow-xl border border-orange-50 overflow-hidden relative group">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-orange-400">📅</span>
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Timeline de la Fase: {PLANTILLAS[plantillaActiva].fase}</span>
+                                    </div>
+                                    <button
+                                        onClick={() => setVistaActual('gantt')}
+                                        className="text-[10px] font-black text-orange-400 hover:underline uppercase"
+                                    >
+                                        Ver en Gantt Completo →
+                                    </button>
+                                </div>
+                                <div className="relative h-12 flex items-center px-4">
+                                    <div className="absolute inset-x-8 h-0.5 bg-slate-100 top-1/2 -translate-y-1/2"></div>
+                                    <div className="flex justify-between w-full relative z-10">
+                                        {HITOS_DEFINICION.filter(h => h.faseId === plantillaActiva).map((h, i, arr) => {
+                                            const completado = proyectoSeleccionado.hitosCompletados.includes(h.id);
+                                            return (
+                                                <div key={h.id} className="flex flex-col items-center gap-1 group/hito">
+                                                    <div
+                                                        onClick={() => onToggleHito(proyectoSeleccionado.id, h.id)}
+                                                        className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] cursor-pointer shadow-sm transition-all hover:scale-110 border-2 border-white ${completado ? h.color + ' text-white' : 'bg-slate-100 text-slate-400 opacity-50'}`}
+                                                        title={h.nombre}
+                                                    >
+                                                        {h.icono}
+                                                    </div>
+                                                    <span className={`text-[8px] font-black ${completado ? 'text-orange-400' : 'text-slate-300'}`}>{h.id}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-[2rem] shadow-2xl border border-gray-100 overflow-hidden ring-1 ring-black/5">
+                                <div className="bg-white border-b border-gray-100 p-8 md:p-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+                                    <div className="flex-1">
+                                        <div className="inline-block bg-orange-50 text-orange-600 text-[10px] font-black px-3 py-1 rounded-full mb-4 tracking-widest uppercase">Vista Previa Expediente</div>
+                                        <h3 className="text-4xl font-black text-gray-700 tracking-tighter leading-none mb-2">{PLANTILLAS[plantillaActiva].nombre}</h3>
+                                        <p className="text-lg text-gray-500 font-bold uppercase tracking-widest">
+                                            <span className="text-orange-400">{proyectoSeleccionado.codigo}</span> — {proyectoSeleccionado.nombre}
+                                        </p>
+                                    </div>
+                                    <div className="no-print flex gap-3 w-full md:w-auto">
+                                        <button
+                                            onClick={() => window.print()}
+                                            className="flex-1 md:flex-none h-14 bg-gray-50 text-gray-700 px-8 rounded-2xl font-black text-sm hover:bg-gray-100 transition-all flex items-center justify-center gap-3 border border-gray-200"
+                                        >
+                                            🖨️ <span className="hidden sm:inline">Imprimir</span>
+                                        </button>
+                                        <button
+                                            onClick={handleSendToOutlook}
+                                            className="flex-1 md:flex-none h-14 bg-orange-400 text-white px-10 rounded-2xl font-black text-sm hover:bg-orange-600 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-xl shadow-orange-100 ring-2 ring-orange-400"
+                                        >
+                                            📧 <span className="hidden sm:inline">Enviar Correo</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 border-b border-gray-100 px-10 py-4 flex justify-between items-center no-print">
+                                    <div className="flex items-center gap-4">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Sincronización de Hitos:</span>
+                                        {PLANTILLAS[plantillaActiva].secciones.find(s => s.id === seccionActiva)?.hitoId ? (
+                                            <div className="flex items-center gap-2">
+                                                <span className="bg-orange-100 text-orange-600 text-[10px] font-bold px-2 py-0.5 rounded">
+                                                    HITO {PLANTILLAS[plantillaActiva].secciones.find(s => s.id === seccionActiva).hitoId}
+                                                </span>
+                                                <button
+                                                    onClick={() => onToggleHito(proyectoSeleccionado.id, PLANTILLAS[plantillaActiva].secciones.find(s => s.id === seccionActiva).hitoId)}
+                                                    className={`px-4 py-1.5 rounded-full text-xs font-black transition-all ${proyectoSeleccionado.hitosCompletados.includes(PLANTILLAS[plantillaActiva].secciones.find(s => s.id === seccionActiva).hitoId)
+                                                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                        : 'bg-red-50 text-red-500 hover:bg-red-100'
+                                                        }`}
+                                                >
+                                                    {proyectoSeleccionado.hitosCompletados.includes(PLANTILLAS[plantillaActiva].secciones.find(s => s.id === seccionActiva).hitoId)
+                                                        ? '✓ COMPLETADO'
+                                                        : '⌛ PENDIENTE (Click para completar)'}
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <span className="text-[10px] text-slate-400 italic">No vinculado a hito temporal</span>
+                                        )}
+                                    </div>
+                                    <div className="text-[10px] font-bold text-slate-400">
+                                        Dossier {plantillaActiva} • Sección {seccionActiva}
+                                    </div>
+                                </div>
+
+                                <div className="p-10 md:p-16 max-h-[800px] overflow-y-auto scroll-smooth custom-scrollbar relative">
+                                    <div className="absolute top-0 left-0 w-full h-20 bg-gradient-to-b from-white to-transparent pointer-events-none z-10 opacity-50"></div>
+                                    <div
+                                        className="prose prose-indigo max-w-none relative z-0"
+                                        dangerouslySetInnerHTML={{ __html: PLANTILLAS[plantillaActiva].contenido(proyectoSeleccionado) }}
+                                    />
+                                    <div className="mt-20 pt-10 border-t border-gray-100 text-center opacity-30 select-none">
+                                        <div className="text-[10px] font-black tracking-[0.5em] text-gray-400 uppercase">Fin del Expediente — Mindsmith CRM 2026</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function VistaBaseDatos({ autores, dts, proyectos, projectAuthors, projectDTs, vistaTab, setVistaTab, onAddAutor, onAddDT, onAddProyecto, onSelectProyecto, onAccederProyecto, setVistaActual }) {
+            const [modal, setModal] = useState({ abierto: false, tipo: null });
+            const [formData, setFormData] = useState({});
+
+            const handleJumpToProject = (projectId) => {
+                setVistaTab('proyectos');
+                setTimeout(() => {
+                    const el = document.getElementById(`row-proj-${projectId}`);
+                    if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        el.classList.add('bg-orange-100', 'ring-2', 'ring-orange-400');
+                        setTimeout(() => el.classList.remove('bg-orange-100', 'ring-2', 'ring-orange-400'), 2000);
+                    }
+                }, 100);
+            };
+
+            const handleExportExcel = (dataExportar = null, nombreArchivo = null) => {
+                // Función flexible: permite exportar data específica o la vista actual
+                let data = [];
+                let filename = nombreArchivo || "";
+
+                if (dataExportar) {
+                    data = dataExportar; // Uso para exportación automática
+                } else {
+                    // Exportación manual basada en vista actual
+                    if (vistaTab === 'autores') {
+                        filename = `Autores_Mindsmith_${new Date().toISOString().split('T')[0]}.xlsx`;
+                        data = autores.map(a => ({
+                            "ID": a.id, "Nombre": a.nombreCompleto, "Email": a.email, "Tipo": a.tipo, "Estado": a.estado
+                        }));
+                    } else if (vistaTab === 'dts') {
+                        filename = `DTs_Mindsmith_${new Date().toISOString().split('T')[0]}.xlsx`;
+                        data = dts.map(d => ({
+                            "ID": d.id, "Nombre": d.nombreCompleto, "Email": d.email, "Facultad": d.facultad, "Estado": d.estado
+                        }));
+                    } else if (vistaTab === 'proyectos') {
+                        filename = `Asignaturas_Mindsmith_${new Date().toISOString().split('T')[0]}.xlsx`;
+                        data = proyectos.map(p => ({
+                            "ID": p.id, "Código": p.codigo, "Asignatura": p.nombre, "DT": p.dt,
+                            "Autor": p.autor, "Edición": p.edicion || 'N/A', "Estado": p.estadoProyecto, "Progreso Hitos": p.hitosCompletados.length
+                        }));
+                    }
+                }
+
+                if (!filename) filename = `Export_Mindsmith_${Date.now()}.xlsx`;
+
+                // Generar Excel con SheetJS
+                const ws = XLSX.utils.json_to_sheet(data);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Datos");
+
+                // Ajuste automático de ancho de columnas (básico)
+                const max_width = data.reduce((w, r) => Math.max(w, JSON.stringify(r).length), 10);
+                ws['!cols'] = [{ wch: 10 }, { wch: 30 }, { wch: 30 }, { wch: 15 }, { wch: 15 }];
+
+                XLSX.writeFile(wb, filename);
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                let newData = null;
+                let filename = "";
+
+                if (modal.tipo === 'autor') {
+                    onAddAutor(formData);
+                    // Preparamos datos completos actualizados
+                    const listaActualizada = [...autores, {
+                        ...formData,
+                        id: 'temp-id',
+                        tipo: formData.tipo || 'interno',
+                        estado: formData.estado || 'activo'
+                    }];
+                    newData = listaActualizada.map(a => ({ "ID": a.id, "Nombre": a.nombreCompleto, "Email": a.email, "Tipo": a.tipo, "Estado": a.estado }));
+                    filename = "Autores_Mindsmith_AutoSave.xlsx";
+                }
+                if (modal.tipo === 'dt') {
+                    onAddDT(formData);
+                    const listaActualizada = [...dts, { ...formData, id: 'temp-id', estado: 'activo' }];
+                    newData = listaActualizada.map(d => ({ "ID": d.id, "Nombre": d.nombreCompleto, "Email": d.email, "Facultad": d.facultad, "Estado": d.estado }));
+                    filename = "DTs_Mindsmith_AutoSave.xlsx";
+                }
+                if (modal.tipo === 'proyecto') {
+                    const fullData = {
+                        ...formData,
+                        nombre: `${formData.asignatura} – ${formData.codigo}`,
+                        // Estado ya viene del form o tiene default
+                        estadoProyecto: formData.estadoProyecto || 'borrador',
+                        edicion: formData.edicion || new Date().getFullYear().toString()
+                    };
+                    onAddProyecto(fullData);
+
+                    const listaActualizada = [...proyectos, { ...fullData, id: 'temp-id', hitosCompletados: [] }];
+                    newData = listaActualizada.map(p => ({
+                        "ID": p.id, "Código": p.codigo, "Asignatura": p.nombre,
+                        "Edición": p.edicion, "Estado": p.estadoProyecto, "Hitos": 0
+                    }));
+                    filename = "Asignaturas_Mindsmith_AutoSave.xlsx";
+                }
+
+                // Auto-Exportar Excel
+                if (newData) {
+                    // Pequeño timeout para dar sensación de procesamiento y asegurar UI libre
+                    setTimeout(() => handleExportExcel(newData, filename), 500);
+                    alert("✅ Registro guardado y copia Excel descargada automáticamente.");
+                }
+
+                setModal({ abierto: false, tipo: null });
+                setFormData({});
+            };
+
+            return (
+                <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                        <h2 className="text-2xl font-bold text-gray-700 flex items-center gap-3">
+                            <span className="bg-orange-400 text-white p-2 rounded-lg text-lg">🗄️</span>
+                            Base de Datos Relacional
+                        </h2>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={handleExportExcel}
+                                className="bg-white text-orange-600 border-2 border-orange-100 px-6 py-2 rounded-lg font-bold shadow-sm hover:bg-orange-50 transition-all flex items-center gap-2"
+                                title="Descargar esta tabla en formato compatible con Excel"
+                            >
+                                📊 Exportar Excel
+                            </button>
+                            <button
+                                onClick={() => setModal({ abierto: true, tipo: vistaTab === 'autores' ? 'autor' : vistaTab === 'dts' ? 'dt' : 'proyecto' })}
+                                className="bg-orange-400 text-white px-6 py-2 rounded-lg font-bold shadow-lg hover:bg-orange-600 transition-all flex items-center gap-2"
+                            >
+                                <span>+</span>
+                                {vistaTab === 'autores' ? 'Crear Nuevo Autor' : vistaTab === 'dts' ? 'Crear Nuevo Director' : 'Crear Nueva Asignatura'}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2 border-b border-gray-200">
+                        {[
+                            { id: 'autores', label: '✍️ Autores' },
+                            { id: 'dts', label: '🎓 Directores (DT)' },
+                            { id: 'proyectos', label: '📚 Asignaturas' }
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setVistaTab(tab.id)}
+                                className={`px-6 py-3 font-bold text-sm transition-all -mb-px ${vistaTab === tab.id ? 'text-orange-400 border-b-2 border-orange-400 bg-orange-50 rounded-t-lg' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        {vistaTab === 'autores' && (
+                            <table className="w-full text-left">
+                                <thead className="bg-gray-50 border-b border-gray-200">
+                                    <tr>
+                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Nombre Completo</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Asignatura</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Tipo</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {autores.map(a => {
+                                        const pLink = projectAuthors.find(l => l.authorId === a.id);
+                                        const proyecto = pLink ? proyectos.find(p => p.id === pLink.projectId) : null;
+                                        return (
+                                            <tr key={a.id} className="hover:bg-gray-50 transition-colors">
+                                                <td className="px-6 py-4 font-medium text-gray-700">{a.nombreCompleto}</td>
+                                                <td className="px-6 py-4 text-gray-500">{a.email}</td>
+                                                <td className="px-6 py-4">
+                                                    {proyecto ? (
+                                                        <button
+                                                            onClick={() => handleJumpToProject(proyecto.id)}
+                                                            className="text-orange-400 font-bold hover:underline text-xs"
+                                                        >
+                                                            📚 {proyecto.nombre}
+                                                        </button>
+                                                    ) : <span className="text-gray-300 text-xs italic">Sin asignar</span>}
+                                                </td>
+                                                <td className="px-6 py-4"><span className="px-2 py-1 bg-gray-100 rounded text-[10px] font-bold uppercase">{a.tipo}</span></td>
+                                                <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${a.estado === 'activo' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{a.estado}</span></td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        )}
+                        {vistaTab === 'dts' && (
+                            <table className="w-full text-left">
+                                <thead className="bg-gray-50 border-b border-gray-200">
+                                    <tr>
+                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Director de Título</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Email</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Autor Asignado</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Asignatura Asignada</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Facultad</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {dts.map(d => {
+                                        const pLink = projectDTs.find(l => l.dtId === d.id);
+                                        const proyecto = pLink ? proyectos.find(p => p.id === pLink.projectId) : null;
+                                        const aLink = proyecto ? projectAuthors.find(l => l.projectId === proyecto.id) : null;
+                                        const autor = aLink ? autores.find(a => a.id === aLink.authorId) : null;
+
+                                        return (
+                                            <tr key={d.id} className="hover:bg-gray-50 transition-colors">
+                                                <td className="px-6 py-4 font-medium text-gray-700">{d.nombreCompleto}</td>
+                                                <td className="px-6 py-4 text-gray-500">{d.email}</td>
+                                                <td className="px-6 py-4 text-gray-500">
+                                                    {autor ? <span className="text-xs font-bold text-slate-600">👤 {autor.nombreCompleto}</span> : <span className="text-gray-300 text-xs italic">-</span>}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {proyecto ? (
+                                                        <button
+                                                            onClick={() => handleJumpToProject(proyecto.id)}
+                                                            className="text-orange-400 font-bold hover:underline text-xs"
+                                                        >
+                                                            📚 {proyecto.nombre}
+                                                        </button>
+                                                    ) : <span className="text-gray-300 text-xs italic">-</span>}
+                                                </td>
+                                                <td className="px-6 py-4 text-gray-500">{d.facultad}</td>
+                                                <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${d.estado === 'activo' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{d.estado}</span></td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        )}
+                        {vistaTab === 'proyectos' && (
+                            <table className="w-full text-left">
+                                <thead className="bg-gray-50 border-b border-gray-200">
+                                    <tr>
+                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Código/ID</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Asignatura</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Estado</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Vínculos</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {proyectos.map(p => (
+                                        <tr
+                                            key={p.id}
+                                            id={`row-proj-${p.id}`}
+                                            className="hover:bg-orange-50 transition-colors cursor-pointer group"
+                                            onClick={() => onSelectProyecto(p)}
+                                        >
+                                            <td className="px-6 py-4 font-mono font-bold text-orange-400 group-hover:underline">{p.codigo}</td>
+                                            <td className="px-6 py-4 font-medium text-gray-700 group-hover:text-orange-400">{p.nombre}</td>
+                                            <td className="px-6 py-4"><span className="px-2 py-1 bg-orange-50 text-orange-600 rounded text-[10px] font-bold uppercase">{p.estadoProyecto}</span></td>
+                                            <td className="px-6 py-4 text-xs text-gray-500">
+                                                <span>{projectAuthors.filter(l => l.projectId === p.id).length} Autores | {projectDTs.filter(l => l.projectId === p.id).length} DTs</span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); onAccederProyecto(p); }}
+                                                    className="bg-orange-50 text-orange-400 px-4 py-2 rounded-lg font-bold text-xs hover:bg-orange-400 hover:text-white transition-all shadow-sm"
+                                                >
+                                                    Acceder
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+
+                    {/* MODAL DE CREACIÓN */}
+                    {modal.abierto && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                            <div className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm" onClick={() => setModal({ abierto: false })}></div>
+                            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                                <div className="bg-orange-400 p-4 text-white font-bold flex justify-between items-center text-lg">
+                                    <span>Crear {modal.tipo === 'autor' ? 'Autor' : modal.tipo === 'dt' ? 'Director' : 'Asignatura'}</span>
+                                    <button onClick={() => setModal({ abierto: false })}>✕</button>
+                                </div>
+                                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                                    {modal.tipo === 'autor' && (
+                                        <>
+                                            <div><label className="text-xs font-bold text-gray-500 uppercase">Nombre Completo</label>
+                                                <input required className="w-full p-2 border rounded mt-1 shadow-sm focus:ring-2 focus:ring-orange-400 outline-none" onChange={e => setFormData({ ...formData, nombreCompleto: e.target.value })} /></div>
+                                            <div><label className="text-xs font-bold text-gray-500 uppercase">Email</label>
+                                                <input required type="email" className="w-full p-2 border rounded mt-1 shadow-sm focus:ring-2 focus:ring-orange-400 outline-none" onChange={e => setFormData({ ...formData, email: e.target.value })} /></div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div><label className="text-xs font-bold text-gray-500 uppercase">Tipo</label>
+                                                    <select className="w-full p-2 border rounded mt-1 shadow-sm focus:ring-2 focus:ring-orange-400 outline-none" onChange={e => setFormData({ ...formData, tipo: e.target.value })}>
+                                                        <option value="interno">Interno</option>
+                                                        <option value="externo">Externo</option>
+                                                    </select></div>
+                                                <div><label className="text-xs font-bold text-gray-500 uppercase">Estado</label>
+                                                    <select className="w-full p-2 border rounded mt-1 shadow-sm focus:ring-2 focus:ring-orange-400 outline-none" onChange={e => setFormData({ ...formData, estado: e.target.value })}>
+                                                        <option value="activo">Activo</option>
+                                                        <option value="inactivo">Inactivo</option>
+                                                    </select></div>
+                                            </div>
+                                            <div><label className="text-xs font-bold text-gray-500 uppercase">Asignatura a Vincular</label>
+                                                <select className="w-full p-2 border rounded mt-1 shadow-sm focus:ring-2 focus:ring-orange-400 outline-none" onChange={e => setFormData({ ...formData, asignatura: e.target.value })}>
+                                                    <option value="">-- Seleccionar Asignatura (Opcional) --</option>
+                                                    {proyectos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                                                </select></div>
+                                        </>
+                                    )}
+                                    {modal.tipo === 'dt' && (
+                                        <>
+                                            <div><label className="text-xs font-bold text-gray-500 uppercase">Nombre Completo</label>
+                                                <input required className="w-full p-2 border rounded mt-1" onChange={e => setFormData({ ...formData, nombreCompleto: e.target.value })} /></div>
+                                            <div><label className="text-xs font-bold text-gray-500 uppercase">Email</label>
+                                                <input required type="email" className="w-full p-2 border rounded mt-1" onChange={e => setFormData({ ...formData, email: e.target.value })} /></div>
+                                            <div><label className="text-xs font-bold text-gray-500 uppercase">Facultad</label>
+                                                <input required className="w-full p-2 border rounded mt-1" onChange={e => setFormData({ ...formData, facultad: e.target.value })} /></div>
+                                        </>
+                                    )}
+                                    {modal.tipo === 'proyecto' && (
+                                        <>
+                                            <div><label className="text-xs font-bold text-gray-500 uppercase">Nombre Asignatura</label>
+                                                <input required className="w-full p-2 border rounded mt-1" onChange={e => setFormData({ ...formData, asignatura: e.target.value })} /></div>
+                                            <div><label className="text-xs font-bold text-gray-500 uppercase">Código (ej: PR00-X)</label>
+                                                <input required className="w-full p-2 border rounded mt-1" onChange={e => setFormData({ ...formData, codigo: e.target.value })} /></div>
+                                            <div><label className="text-xs font-bold text-gray-500 uppercase">Edición</label>
+                                                <input className="w-full p-2 border rounded mt-1" placeholder="Ej: 2026-1" onChange={e => setFormData({ ...formData, edicion: e.target.value })} /></div>
+                                            <div><label className="text-xs font-bold text-gray-500 uppercase">Estado</label>
+                                                <select className="w-full p-2 border rounded mt-1" onChange={e => setFormData({ ...formData, estadoProyecto: e.target.value })}>
+                                                    <option value="borrador">Borrador</option>
+                                                    <option value="activo">Activo</option>
+                                                    <option value="pausado">Pausado</option>
+                                                    <option value="finalizado">Finalizado</option>
+                                                    <option value="archivado">Archivado</option>
+                                                </select>
+                                            </div>
+                                        </>
+                                    )}
+                                    <div className="pt-4 flex gap-3">
+                                        <button type="button" onClick={() => setModal({ abierto: false })} className="flex-1 px-4 py-2 border rounded-lg font-bold text-gray-500">Cancelar</button>
+                                        <button type="submit" className="flex-1 px-4 py-2 bg-orange-400 text-white rounded-lg font-bold shadow-md">Guardar Registro</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function VistaFichaAsignatura({ proyecto, autores, dts, getAutores, getDTs, setVistaActual }) {
+            if (!proyecto) return null;
+
+            return (
+                <div className="space-y-6 max-w-5xl mx-auto">
+                    <div className="flex items-center justify-between no-print">
+                        <button
+                            onClick={() => setVistaActual('database')}
+                            className="text-gray-500 hover:text-orange-400 font-bold flex items-center gap-2 transition-colors"
+                        >
+                            <span>←</span> Volver a Base de Datos
+                        </button>
+                        <div className="flex gap-2">
+                            <span className="bg-orange-100 text-orange-600 px-3 py-1 rounded text-xs font-bold uppercase">
+                                {proyecto.estadoProyecto}
+                            </span>
+                            <span className="bg-green-100 text-green-700 px-3 py-1 rounded text-xs font-bold uppercase">
+                                Edición: {proyecto.edicion || 'N/A'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-200">
+                        {/* HEADER DE LA FICHA */}
+                        <div className="bg-orange-400 p-8 text-white relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-20 -mt-20"></div>
+                            <div className="flex justify-between items-start relative z-10">
+                                <div>
+                                    <div className="text-indigo-200 font-mono text-sm mb-2 tracking-widest">{proyecto.codigo}</div>
+                                    <h2 className="text-4xl font-bold">{proyecto.nombre}</h2>
+                                    <p className="text-orange-100 mt-2 text-lg">Dossier Técnico Universitario</p>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-5xl font-black text-orange-400 opacity-50">ECTS</div>
+                                    <div className="text-3xl font-bold">6.0</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-8 grid md:grid-cols-3 gap-8">
+                            {/* COLUMNA IZQUIERDA: DETALLES */}
+                            <div className="md:col-span-2 space-y-8">
+                                <section>
+                                    <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 border-b pb-2">Descripción General</h3>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div className="bg-gray-50 p-4 rounded-xl">
+                                            <div className="text-xs text-gray-500 mb-1">Facultad / Área</div>
+                                            <div className="font-bold text-gray-700">{proyecto.facultad || 'Ciencias de la Salud'}</div>
+                                        </div>
+                                        <div className="bg-gray-50 p-4 rounded-xl">
+                                            <div className="text-xs text-gray-500 mb-1">Tipo de Asignatura</div>
+                                            <div className="font-bold text-gray-700">Obligatoria / Grado</div>
+                                        </div>
+                                        <div className="bg-gray-50 p-4 rounded-xl">
+                                            <div className="text-xs text-gray-500 mb-1">Idioma de Impartición</div>
+                                            <div className="font-bold text-gray-700">Español</div>
+                                        </div>
+                                        <div className="bg-gray-50 p-4 rounded-xl">
+                                            <div className="text-xs text-gray-500 mb-1">Última Actualización</div>
+                                            <div className="font-bold text-gray-700">{new Date().toLocaleDateString()}</div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section>
+                                    <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 border-b pb-2">Equipo Académico</h3>
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-4 p-4 bg-orange-50 border border-orange-100 rounded-xl">
+                                            <div className="bg-white p-3 rounded-full text-xl shadow-sm">🎓</div>
+                                            <div>
+                                                <div className="text-xs text-orange-400 font-bold uppercase">Director de Título (DT)</div>
+                                                <div className="font-bold text-gray-700">{getDTs(proyecto.id) || proyecto.dt || 'Pendiente de asignar'}</div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
+                                            <div className="bg-gray-100 p-3 rounded-full text-xl">✍️</div>
+                                            <div>
+                                                <div className="text-xs text-gray-400 font-bold uppercase">Autor/es Asignados</div>
+                                                <div className="font-bold text-gray-700">{getAutores(proyecto.id) || proyecto.autor || 'Pendiente de asignar'}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+                            </div>
+
+                            {/* COLUMNA DERECHA: PROGRESO Y ACCIONES */}
+                            <div className="space-y-6">
+                                <div className="bg-slate-700 rounded-2xl p-6 text-white shadow-xl">
+                                    <h4 className="text-xs font-bold text-orange-400 uppercase tracking-widest mb-4">Estado del PR00-1</h4>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <div className="flex justify-between text-sm mb-2">
+                                                <span>Progreso de Hitos</span>
+                                                <span className="font-bold">{Math.round((proyecto.hitosCompletados.length / 12) * 100)}%</span>
+                                            </div>
+                                            <div className="w-full bg-slate-800 rounded-full h-2">
+                                                <div
+                                                    className="bg-orange-400 h-2 rounded-full transition-all duration-1000"
+                                                    style={{ width: `${(proyecto.hitosCompletados.length / 12) * 100}%` }}
+                                                ></div>
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-4 space-y-2">
+                                            <div className="flex items-center gap-2 text-sm text-orange-100">
+                                                <span className="text-green-400 font-bold">●</span>
+                                                <span>{proyecto.hitosCompletados.length} hitos alcanzados</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-sm text-indigo-200">
+                                                <span className="text-orange-400 font-bold">●</span>
+                                                <span>{12 - proyecto.hitosCompletados.length} pendientes</span>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            onClick={() => setVistaActual('gantt')}
+                                            className="w-full bg-orange-400 hover:bg-orange-400 p-3 rounded-xl font-bold transition-all mt-4 text-sm no-print"
+                                        >
+                                            Ver en Timeline Proyectos 📊
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>
