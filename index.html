@@ -1003,6 +1003,25 @@
 
             const updateDT = (dtId, newData) => {
                 setDts(prev => prev.map(d => d.id === dtId ? { ...d, ...newData, updatedAt: new Date().toISOString() } : d));
+
+                // Actualizar Vínculo con Proyecto
+                if (newData.projectId) {
+                    setProjectDTs(prev => {
+                        const filtered = prev.filter(l => l.dtId !== dtId);
+                        if (newData.projectId === 'none') return filtered;
+                        return [...filtered, { dtId, projectId: newData.projectId, rolEnProyecto: 'director', fechaAsignacion: new Date().toISOString(), estadoAsignacion: 'activa' }];
+                    });
+                }
+
+                // Actualizar Vínculo de Autor con Proyecto (Solo si hay proyecto seleccionado)
+                if (newData.projectId && newData.projectId !== 'none' && newData.authorId) {
+                    setProjectAuthors(prev => {
+                        const filtered = prev.filter(l => l.projectId !== newData.projectId);
+                        if (newData.authorId === 'none') return filtered;
+                        return [...filtered, { authorId: newData.authorId, projectId: newData.projectId, rolEnProyecto: 'autor_principal', fechaAsignacion: new Date().toISOString(), estadoAsignacion: 'activa' }];
+                    });
+                }
+
                 setAcciones(prev => [...prev, { id: Date.now(), type: 'updateRecord', payload: { entityType: 'dts', recordId: dtId, data: newData }, timestamp: new Date().toISOString() }]);
             };
 
@@ -2323,7 +2342,18 @@
                                         return (
                                             <tr key={d.id} className="hover:bg-gray-50 transition-colors">
                                                 <td className="px-6 py-4 font-medium text-gray-700">
-                                                    <button onClick={() => { setDtDetailModal({ abierto: true, dt: d }); setDtEditData(d); }} className="text-orange-400 hover:underline font-bold">👤 {d.nombreCompleto}</button>
+                                                    <div className="col-span-2">
+                                                        <button onClick={() => {
+                                                            // Logic to find links
+                                                            const pLink = projectDTs.find(l => l.dtId === d.id);
+                                                            const currentProjId = pLink ? pLink.projectId : '';
+                                                            const aLink = currentProjId ? projectAuthors.find(l => l.projectId === currentProjId) : null;
+                                                            const currentAuthId = aLink ? aLink.authorId : '';
+
+                                                            setDtDetailModal({ abierto: true, dt: d });
+                                                            setDtEditData({ ...d, projectId: currentProjId, authorId: currentAuthId });
+                                                        }} className="text-orange-400 hover:underline font-bold">👤 {d.nombreCompleto}</button>
+                                                    </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-gray-500">{d.email}</td>
                                                 <td className="px-6 py-4 text-gray-500">
@@ -2373,6 +2403,34 @@
                                             <div>
                                                 <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Facultad</label>
                                                 <input type="text" value={dtEditData.facultad || ''} onChange={e => setDtEditData({ ...dtEditData, facultad: e.target.value })} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-400 outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Asignar Asignatura (Proyecto)</label>
+                                                <select
+                                                    value={dtEditData.projectId || ''}
+                                                    onChange={e => setDtEditData({ ...dtEditData, projectId: e.target.value })}
+                                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-400 outline-none"
+                                                >
+                                                    <option value="">-- Sin Asignar --</option>
+                                                    {proyectos.map(p => (
+                                                        <option key={p.id} value={p.id}>{p.nombre}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Asignar Autor (al Proyecto)</label>
+                                                <select
+                                                    value={dtEditData.authorId || ''}
+                                                    onChange={e => setDtEditData({ ...dtEditData, authorId: e.target.value })}
+                                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-400 outline-none"
+                                                    disabled={!dtEditData.projectId}
+                                                >
+                                                    <option value="">-- Sin Autor --</option>
+                                                    {autores.map(a => (
+                                                        <option key={a.id} value={a.id}>{a.nombreCompleto}</option>
+                                                    ))}
+                                                </select>
+                                                {!dtEditData.projectId && <p className="text-[10px] text-red-400 mt-1">* Selecciona una asignatura primero</p>}
                                             </div>
                                             <div>
                                                 <label className="text-xs font-bold text-gray-500 uppercase block mb-2">Estado</label>
