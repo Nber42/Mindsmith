@@ -981,6 +981,21 @@
                 setAcciones(prev => [...prev, { id: Date.now(), type: 'createRecord', payload: { entityType: 'projects', data: nuevo }, timestamp: new Date().toISOString() }]);
             };
 
+            const accederProyecto = (p) => {
+                console.log("Accediendo a proyecto:", p);
+                try {
+                    setProyectoSeleccionado(p);
+                    // Force update on next tick to ensure state is ready
+                    setTimeout(() => {
+                        setVistaActual('ficha_asignatura');
+                        console.log("Vista cambiada a ficha_asignatura");
+                    }, 10);
+                } catch (err) {
+                    console.error("Error al acceder:", err);
+                    alert("Error al intentar abrir el proyecto. Ver consola.");
+                }
+            };
+
             const updateProyecto = (projectId, newData) => {
                 setProyectos(prev => prev.map(p => p.id === projectId ? { ...p, ...newData, updatedAt: new Date().toISOString() } : p));
                 setAcciones(prev => [...prev, { id: Date.now(), type: 'updateRecord', payload: { entityType: 'projects', recordId: projectId, data: newData }, timestamp: new Date().toISOString() }]);
@@ -1217,7 +1232,7 @@
                                 onAddProyecto={agregarProyecto}
                                 onUpdateDT={updateDT}
                                 onSelectProyecto={setProyectoSeleccionado}
-                                onAccederProyecto={(p) => { setProyectoSeleccionado(p); setVistaActual('plantillas'); }}
+                                onAccederProyecto={accederProyecto}
                                 setVistaActual={setVistaActual}
                             />
                         )}
@@ -2402,7 +2417,7 @@
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <button
-                                                    onClick={(e) => { e.stopPropagation(); onSelectProyecto(p); setVistaActual('ficha'); }}
+                                                    onClick={(e) => { e.stopPropagation(); onAccederProyecto(p); }}
                                                     className="bg-orange-50 text-orange-400 px-4 py-2 rounded-lg font-bold text-xs hover:bg-orange-400 hover:text-white transition-all shadow-sm"
                                                 >
                                                     Acceder
