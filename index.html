@@ -2021,6 +2021,15 @@
                                                         {sec.hitoId ? `Hito: ${sec.hitoId}` : sec.sub}
                                                     </div>
                                                 </div>
+                                                {sec.hitoId && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); onToggleHito(proyectoSeleccionado.id, sec.hitoId); }}
+                                                        className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all shadow-sm ${hitoCompletado ? 'bg-green-500 border-green-600 text-white' : 'bg-white border-gray-200 text-gray-300 hover:border-orange-300 hover:text-orange-300'}`}
+                                                        title={hitoCompletado ? "Hito Completado" : "Marcar Hito"}
+                                                    >
+                                                        {hitoCompletado ? '✓' : '○'}
+                                                    </button>
+                                                )}
                                             </button>
                                         );
                                     })}
@@ -2093,30 +2102,9 @@
 
                                 <div className="bg-slate-50 border-b border-gray-100 px-10 py-4 flex justify-between items-center no-print">
                                     <div className="flex items-center gap-4">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Sincronización de Hitos:</span>
-                                        {PLANTILLAS[plantillaActiva].secciones.find(s => s.id === seccionActiva)?.hitoId ? (
-                                            <div className="flex items-center gap-2">
-                                                <span className="bg-orange-100 text-orange-600 text-[10px] font-bold px-2 py-0.5 rounded">
-                                                    HITO {PLANTILLAS[plantillaActiva].secciones.find(s => s.id === seccionActiva).hitoId}
-                                                </span>
-                                                <button
-                                                    onClick={() => onToggleHito(proyectoSeleccionado.id, PLANTILLAS[plantillaActiva].secciones.find(s => s.id === seccionActiva).hitoId)}
-                                                    className={`px-4 py-1.5 rounded-full text-xs font-black transition-all ${proyectoSeleccionado.hitosCompletados.includes(PLANTILLAS[plantillaActiva].secciones.find(s => s.id === seccionActiva).hitoId)
-                                                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                                        : 'bg-red-50 text-red-500 hover:bg-red-100'
-                                                        }`}
-                                                >
-                                                    {proyectoSeleccionado.hitosCompletados.includes(PLANTILLAS[plantillaActiva].secciones.find(s => s.id === seccionActiva).hitoId)
-                                                        ? '✓ COMPLETADO'
-                                                        : '⌛ PENDIENTE (Click para completar)'}
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <span className="text-[10px] text-slate-400 italic">No vinculado a hito temporal</span>
-                                        )}
-                                    </div>
-                                    <div className="text-[10px] font-bold text-slate-400">
-                                        Dossier {plantillaActiva} • Sección {seccionActiva}
+                                        <div className="text-[10px] font-bold text-slate-400">
+                                            Dossier {plantillaActiva} • Sección {seccionActiva}
+                                        </div>
                                     </div>
                                 </div>
 
