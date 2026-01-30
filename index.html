@@ -2181,54 +2181,26 @@
 
             const handleSubmit = (e) => {
                 e.preventDefault();
-                let newData = null;
-                let filename = "";
 
                 if (modal.tipo === 'autor') {
                     onAddAutor(formData);
-                    // Preparamos datos completos actualizados
-                    const listaActualizada = [...autores, {
-                        ...formData,
-                        id: 'temp-id',
-                        tipo: formData.tipo || 'interno',
-                        estado: formData.estado || 'activo'
-                    }];
-                    newData = listaActualizada.map(a => ({ "ID": a.id, "Nombre": a.nombreCompleto, "Email": a.email, "Tipo": a.tipo, "Estado": a.estado }));
-                    filename = "Autores_Mindsmith_AutoSave.xlsx";
                 }
                 if (modal.tipo === 'dt') {
                     onAddDT(formData);
-                    const listaActualizada = [...dts, { ...formData, id: 'temp-id', estado: 'activo' }];
-                    newData = listaActualizada.map(d => ({ "ID": d.id, "Nombre": d.nombreCompleto, "Email": d.email, "Facultad": d.facultad, "Estado": d.estado }));
-                    filename = "DTs_Mindsmith_AutoSave.xlsx";
                 }
                 if (modal.tipo === 'proyecto') {
                     const fullData = {
                         ...formData,
                         nombre: `${formData.asignatura} – ${formData.codigo}`,
-                        // Estado ya viene del form o tiene default
                         estadoProyecto: formData.estadoProyecto || 'borrador',
                         edicion: formData.edicion || new Date().getFullYear().toString()
                     };
                     onAddProyecto(fullData);
-
-                    const listaActualizada = [...proyectos, { ...fullData, id: 'temp-id', hitosCompletados: [] }];
-                    newData = listaActualizada.map(p => ({
-                        "ID": p.id, "Código": p.codigo, "Asignatura": p.nombre,
-                        "Edición": p.edicion, "Estado": p.estadoProyecto, "Hitos": 0
-                    }));
-                    filename = "Asignaturas_Mindsmith_AutoSave.xlsx";
-                }
-
-                // Auto-Exportar Excel
-                if (newData) {
-                    // Pequeño timeout para dar sensación de procesamiento y asegurar UI libre
-                    setTimeout(() => handleExportExcel(newData, filename), 500);
-                    alert("✅ Registro guardado y copia Excel descargada automáticamente.");
                 }
 
                 setModal({ abierto: false, tipo: null });
                 setFormData({});
+                alert("✅ Registro guardado correctamente.");
             };
 
             return (
